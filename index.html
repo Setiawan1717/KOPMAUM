@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profil Organisasi | Kopma UM</title>
+    
+    <!-- Google Fonts: Poppins (Headings) & Inter (Body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'um-blue': '#003366',
+                        'um-yellow': '#FFB800',
+                        'um-yellow-hover': '#E5A600',
+                    },
+                    fontFamily: {
+                        'poppins': ['Poppins', 'sans-serif'],
+                        'inter': ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            scroll-behavior: smooth;
+        }
+        h1, h2, h3, h4, h5, h6, .font-heading {
+            font-family: 'Poppins', sans-serif;
+        }
+        .hero-overlay {
+            background: linear-gradient(to bottom, rgba(0, 51, 102, 0.9), rgba(0, 51, 102, 0.7));
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased">
+
+    <!-- Navbar -->
+    <nav class="fixed w-full z-50 bg-white/95 backdrop-blur-sm shadow-sm transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-20">
+                <!-- Logo Area -->
+                <a href="index.html" class="flex-shrink-0 flex items-center gap-3 group">
+                    <div class="w-10 h-10 bg-um-blue rounded-full flex items-center justify-center text-white font-bold group-hover:bg-um-yellow group-hover:text-um-blue transition">
+                        UM
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-um-blue leading-tight">KOPMA UM</h1>
+                        <p class="text-[10px] text-slate-500 font-inter">Koperasi Mahasiswa Universitas Negeri Malang</p>
+                    </div>
+                </a>
+
+                <!-- Desktop Menu -->
+                <div class="hidden md:flex space-x-8 items-center">
+                    <a href="index.html" class="text-slate-600 font-medium hover:text-um-blue transition">Beranda</a>
+                    <a href="#" class="text-um-blue font-medium hover:text-um-yellow transition">Profil</a>
+                    <a href="index.html#unit-usaha" class="text-slate-600 font-medium hover:text-um-blue transition">Unit Usaha</a>
+                    <a href="index.html#daftar" class="bg-um-yellow hover:bg-um-yellow-hover text-um-blue font-bold px-6 py-2.5 rounded-full shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5">
+                        Portal Member
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 1. Halaman Sampul (Cover) -->
+    <section class="relative pt-32 pb-20 flex items-center min-h-[60vh] text-center" style="background-image: url('https://images.unsplash.com/photo-1523240795612-9a054b0db644?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80'); background-size: cover; background-position: center;">
+        <div class="absolute inset-0 hero-overlay"></div>
+        <div class="relative max-w-4xl mx-auto px-4 z-10 w-full mt-10">
+            <!-- Logos -->
+            <div class="flex justify-center gap-6 mb-8">
+                <div class="w-20 h-20 bg-white rounded-full p-2 shadow-lg flex items-center justify-center">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Logo_Universitas_Negeri_Malang.png/600px-Logo_Universitas_Negeri_Malang.png" alt="Logo UM" class="w-full h-full object-contain opacity-80" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <span class="hidden text-um-blue font-bold text-xl">UM</span>
+                </div>
+                <div class="w-20 h-20 bg-um-yellow rounded-full p-2 shadow-lg flex items-center justify-center border-4 border-white">
+                    <i class="fas fa-handshake text-3xl text-um-blue"></i>
+                </div>
+            </div>
+            
+            <h1 class="text-4xl md:text-5xl font-extrabold text-white leading-tight mb-4 tracking-wide">
+                COMPANY PROFILE<br>KOPMA UM
+            </h1>
+            <p class="text-xl md:text-2xl text-um-yellow font-medium mb-6 font-poppins">
+                "Kembangkan Potensi, Berkarya Bersama"
+            </p>
+            <span class="inline-block py-2 px-6 rounded-full bg-white/20 text-white text-sm font-semibold backdrop-blur-sm border border-white/30">
+                Kabinet Eksplorasi | Periode Kepengurusan 2026/2027
+            </span>
+        </div>
+    </section>
+
+    <!-- 2. Tentang Kami & Sejarah Singkat -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row gap-16 items-center">
+                <div class="md:w-1/2">
+                    <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 text-um-blue font-semibold text-sm mb-6">
+                        <i class="fas fa-info-circle"></i> Tentang Kami
+                    </div>
+                    <h2 class="text-3xl md:text-4xl font-bold text-um-blue mb-6">Lebih Dekat dengan Kopma UM</h2>
+                    <p class="text-slate-600 mb-6 leading-relaxed">
+                        Koperasi Mahasiswa Universitas Negeri Malang (Kopma UM) adalah Unit Kegiatan Mahasiswa (UKM) di tingkat universitas yang bergerak di bidang kewirausahaan dan perkoperasian. Kami mewadahi mahasiswa UM untuk belajar praktik bisnis nyata, mengelola organisasi, dan membangun jiwa <span class="font-bold text-um-blue">entrepreneurship</span>.
+                    </p>
+                    <h3 class="text-xl font-bold text-um-blue mb-3 border-l-4 border-um-yellow pl-3">Sejarah Singkat</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        Didirikan pada tanggal <span class="font-semibold text-slate-800">14 Maret 1982</span>, Kopma UM lahir dari keresahan mahasiswa akan pentingnya kemandirian ekonomi di lingkungan kampus. Dimulai dari sebuah kantin kecil yang dikelola bersama, kini Kopma UM telah bertransformasi menjadi badan usaha mahasiswa profesional dengan berbagai unit usaha fungsional yang melayani ribuan anggota setiap tahunnya.
+                    </p>
+                </div>
+                <div class="md:w-1/2">
+                    <div class="relative rounded-3xl overflow-hidden shadow-2xl">
+                        <img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="Diskusi Anggota Kopma" class="w-full h-auto object-cover">
+                        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-um-blue to-transparent p-8 pt-20">
+                            <p class="text-white font-medium text-lg">"Dari Mahasiswa, Oleh Mahasiswa, Untuk Mahasiswa"</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. Visi dan Misi -->
+    <section class="py-20 bg-slate-50 relative overflow-hidden">
+        <!-- Dekorasi Background -->
+        <div class="absolute top-0 right-0 w-64 h-64 bg-um-yellow rounded-full blur-3xl opacity-10 -translate-y-1/2 translate-x-1/2"></div>
+        <div class="absolute bottom-0 left-0 w-80 h-80 bg-um-blue rounded-full blur-3xl opacity-10 translate-y-1/2 -translate-x-1/2"></div>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center max-w-3xl mx-auto mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold text-um-blue mb-4">Visi & Misi</h2>
+                <div class="w-20 h-1.5 bg-um-yellow mx-auto rounded-full"></div>
+            </div>
+
+            <div class="flex flex-col md:flex-row gap-8">
+                <!-- Visi -->
+                <div class="md:w-1/3 bg-um-blue rounded-3xl p-10 text-center shadow-xl transform transition hover:-translate-y-2">
+                    <div class="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center text-um-yellow text-4xl mx-auto mb-6 backdrop-blur-sm">
+                        <i class="fas fa-eye"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white mb-6">Visi</h3>
+                    <p class="text-slate-200 text-lg leading-relaxed font-medium">
+                        "Terwujudnya Kopma UM sebagai lembaga profit dan wadah kaderisasi kewirausahaan mahasiswa yang unggul, inovatif, dan berlandaskan asas kekeluargaan di tingkat Nasional."
+                    </p>
+                </div>
+
+                <!-- Misi -->
+                <div class="md:w-2/3 bg-white border border-slate-100 rounded-3xl p-10 shadow-xl">
+                    <h3 class="text-2xl font-bold text-um-blue mb-8 flex items-center gap-3">
+                        <i class="fas fa-bullseye text-um-yellow"></i> Misi Kami
+                    </h3>
+                    <div class="space-y-6">
+                        <div class="flex gap-4 items-start">
+                            <div class="w-10 h-10 rounded-full bg-blue-50 text-um-blue flex items-center justify-center font-bold flex-shrink-0">1</div>
+                            <p class="text-slate-600 pt-2">Meningkatkan kualitas sumber daya anggota melalui program pendidikan, pelatihan, dan praktik langsung dalam mengelola unit usaha.</p>
+                        </div>
+                        <div class="flex gap-4 items-start">
+                            <div class="w-10 h-10 rounded-full bg-blue-50 text-um-blue flex items-center justify-center font-bold flex-shrink-0">2</div>
+                            <p class="text-slate-600 pt-2">Mengoptimalkan dan melakukan inovasi pelayanan pada seluruh unit usaha agar relevan dengan kebutuhan mahasiswa era digital.</p>
+                        </div>
+                        <div class="flex gap-4 items-start">
+                            <div class="w-10 h-10 rounded-full bg-blue-50 text-um-blue flex items-center justify-center font-bold flex-shrink-0">3</div>
+                            <p class="text-slate-600 pt-2">Memperluas jaringan kemitraan bisnis dengan instansi internal kampus maupun eksternal di tingkat regional dan nasional.</p>
+                        </div>
+                        <div class="flex gap-4 items-start">
+                            <div class="w-10 h-10 rounded-full bg-blue-50 text-um-blue flex items-center justify-center font-bold flex-shrink-0">4</div>
+                            <p class="text-slate-600 pt-2">Menciptakan lingkungan kerja organisasi yang harmonis dengan menjunjung tinggi asas kekeluargaan dan profesionalisme.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. Filosofi Logo -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="bg-slate-900 rounded-[3rem] p-8 md:p-16 overflow-hidden relative">
+                <div class="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-um-blue/50 to-transparent"></div>
+                <div class="flex flex-col md:flex-row gap-12 items-center relative z-10">
+                    <div class="md:w-1/3 flex justify-center">
+                        <!-- Placeholder Logo Kopma -->
+                        <div class="w-64 h-64 bg-white rounded-full p-4 shadow-2xl flex items-center justify-center border-8 border-um-yellow relative">
+                            <div class="text-center">
+                                <i class="fas fa-handshake text-6xl text-um-blue mb-2"></i>
+                                <h3 class="text-xl font-black text-um-blue tracking-wider">KOPMA</h3>
+                                <p class="text-xs font-bold text-slate-500">UNIVERSITAS NEGERI MALANG</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="md:w-2/3">
+                        <h2 class="text-3xl md:text-4xl font-bold text-white mb-8">Filosofi Logo</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div class="flex gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-xl flex-shrink-0"><i class="fas fa-tint"></i></div>
+                                <div>
+                                    <h4 class="text-lg font-bold text-white mb-2">Warna Biru</h4>
+                                    <p class="text-slate-400 text-sm">Melambangkan kedalaman ilmu, profesionalitas, dan keselarasan dengan identitas institusi Universitas Negeri Malang.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-yellow-500/20 text-um-yellow flex items-center justify-center text-xl flex-shrink-0"><i class="fas fa-sun"></i></div>
+                                <div>
+                                    <h4 class="text-lg font-bold text-white mb-2">Warna Kuning</h4>
+                                    <p class="text-slate-400 text-sm">Mewakili kejayaan, energi anak muda yang dinamis, optimisme, dan semangat kewirausahaan yang terus menyala.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-white/10 text-white flex items-center justify-center text-xl flex-shrink-0"><i class="fas fa-handshake"></i></div>
+                                <div>
+                                    <h4 class="text-lg font-bold text-white mb-2">Simbol Jabat Tangan</h4>
+                                    <p class="text-slate-400 text-sm">Asas gotong royong dan kekeluargaan yang menjadi urat nadi koperasi, serta terjalinnya kemitraan bisnis yang kuat.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-white/10 text-white flex items-center justify-center text-xl flex-shrink-0"><i class="fas fa-circle-notch"></i></div>
+                                <div>
+                                    <h4 class="text-lg font-bold text-white mb-2">Bentuk Melingkar</h4>
+                                    <p class="text-slate-400 text-sm">Siklus perputaran ekonomi yang berkelanjutan dan ikatan anggota yang tidak akan pernah terputus.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 5 & 6. Struktur Pengurus & Departemen -->
+    <section class="py-20 bg-slate-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center max-w-3xl mx-auto mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold text-um-blue mb-4">Struktur Organisasi & Divisi</h2>
+                <div class="w-20 h-1.5 bg-um-yellow mx-auto rounded-full mb-6"></div>
+                <p class="text-slate-600 text-lg">Digerakkan oleh mahasiswa berkompeten yang terbagi dalam berbagai divisi fungsional untuk memastikan roda organisasi dan bisnis berjalan optimal.</p>
+            </div>
+
+            <!-- Pengurus Inti (Cards) -->
+            <div class="mb-16">
+                <h3 class="text-2xl font-bold text-center text-um-blue mb-8">Pengurus Inti (BPH)</h3>
+                <div class="flex flex-wrap justify-center gap-6">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 text-center w-64 hover:shadow-md transition">
+                        <img src="https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&auto=format&fit=crop&w=256&q=80" alt="Ketua Umum" class="w-24 h-24 rounded-full mx-auto mb-4 object-cover border-4 border-blue-50">
+                        <h4 class="font-bold text-slate-800 text-lg">Ahmad Fauzi</h4>
+                        <p class="text-sm text-um-yellow font-semibold">Ketua Umum</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 text-center w-64 hover:shadow-md transition">
+                        <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&auto=format&fit=crop&w=256&q=80" alt="Sekretaris Umum" class="w-24 h-24 rounded-full mx-auto mb-4 object-cover border-4 border-blue-50">
+                        <h4 class="font-bold text-slate-800 text-lg">Siti Nurbaya</h4>
+                        <p class="text-sm text-um-blue font-semibold">Sekretaris Umum</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 text-center w-64 hover:shadow-md transition">
+                        <img src="https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&auto=format&fit=crop&w=256&q=80" alt="Bendahara Umum" class="w-24 h-24 rounded-full mx-auto mb-4 object-cover border-4 border-blue-50">
+                        <h4 class="font-bold text-slate-800 text-lg">Dian Sastro</h4>
+                        <p class="text-sm text-um-blue font-semibold">Bendahara Umum</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Divisi / Departemen Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <!-- PSDA -->
+                <div class="bg-white p-8 rounded-2xl border border-slate-200 hover:border-um-blue hover:shadow-lg transition group">
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-14 h-14 bg-blue-50 text-um-blue rounded-xl flex items-center justify-center text-2xl group-hover:bg-um-blue group-hover:text-white transition">
+                            <i class="fas fa-users-cog"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-800">Bidang PSDA</h3>
+                    </div>
+                    <p class="text-sm font-semibold text-um-yellow mb-2">Pengembangan Sumber Daya Anggota</p>
+                    <p class="text-slate-600 text-sm leading-relaxed">
+                        Bertanggung jawab atas rekrutmen (Open Recruitment), kaderisasi, pendidikan lanjutan, serta pemeliharaan ikatan kekeluargaan seluruh anggota Kopma UM.
+                    </p>
+                </div>
+
+                <!-- Usaha -->
+                <div class="bg-white p-8 rounded-2xl border border-slate-200 hover:border-um-yellow hover:shadow-lg transition group">
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-14 h-14 bg-yellow-50 text-um-yellow rounded-xl flex items-center justify-center text-2xl group-hover:bg-um-yellow group-hover:text-white transition">
+                            <i class="fas fa-store-alt"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-800">Bidang Usaha</h3>
+                    </div>
+                    <p class="text-sm font-semibold text-um-blue mb-2">Manajemen Bisnis & Operasional</p>
+                    <p class="text-slate-600 text-sm leading-relaxed">
+                        Tupoksi utama adalah merancang strategi bisnis, melakukan riset pasar, dan mengontrol operasional harian di unit Kopma Mart, Kopma Print, dan Kopma Rental.
+                    </p>
+                </div>
+
+                <!-- Humas -->
+                <div class="bg-white p-8 rounded-2xl border border-slate-200 hover:border-um-blue hover:shadow-lg transition group">
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-14 h-14 bg-blue-50 text-um-blue rounded-xl flex items-center justify-center text-2xl group-hover:bg-um-blue group-hover:text-white transition">
+                            <i class="fas fa-bullhorn"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-800">Bidang Humas & Media</h3>
+                    </div>
+                    <p class="text-sm font-semibold text-um-yellow mb-2">Hubungan Masyarakat & Publikasi</p>
+                    <p class="text-slate-600 text-sm leading-relaxed">
+                        Menjaga citra organisasi melalui pengelolaan sosial media, website, desain visual (company profile, poster), serta menjalin kerjasama dengan sponsor/mitra eksternal.
+                    </p>
+                </div>
+
+                <!-- Administrasi & IT -->
+                <div class="bg-white p-8 rounded-2xl border border-slate-200 hover:border-um-yellow hover:shadow-lg transition group">
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-14 h-14 bg-yellow-50 text-um-yellow rounded-xl flex items-center justify-center text-2xl group-hover:bg-um-yellow group-hover:text-white transition">
+                            <i class="fas fa-laptop-code"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-800">Bidang Adminstrasi & IT</h3>
+                    </div>
+                    <p class="text-sm font-semibold text-um-blue mb-2">Sistem Informasi & Tata Usaha</p>
+                    <p class="text-slate-600 text-sm leading-relaxed">
+                        Mengurus persuratan, inventaris kesekretariatan, pengarsipan, serta pengelolaan database keanggotaan dan maintenance website portal member.
+                    </p>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- 6.5. Profil Unit Usaha Kopma -->
+    <section class="py-20 bg-um-blue text-white relative overflow-hidden">
+        <!-- Dekorasi Background -->
+        <div class="absolute top-0 right-0 w-80 h-80 bg-um-yellow rounded-full blur-3xl opacity-10 -translate-y-1/2 translate-x-1/2"></div>
+        <div class="absolute bottom-0 left-0 w-80 h-80 bg-white rounded-full blur-3xl opacity-5 translate-y-1/2 -translate-x-1/2"></div>
+        
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center max-w-3xl mx-auto mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Unit Usaha Kami</h2>
+                <div class="w-20 h-1.5 bg-um-yellow mx-auto rounded-full mb-6"></div>
+                <p class="text-slate-300 text-lg">Sebagai laboratorium kewirausahaan, Kopma UM mengelola tiga pilar bisnis utama yang beroperasi secara profesional untuk melayani kebutuhan civitas akademika Universitas Negeri Malang.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Kopma Mart -->
+                <div class="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 hover:-translate-y-2 transition duration-300 flex flex-col h-full">
+                    <div>
+                        <div class="w-16 h-16 bg-um-yellow text-um-blue rounded-2xl flex items-center justify-center text-3xl mb-6 shadow-xl">
+                            <i class="fas fa-shopping-basket"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-white mb-3">Kopma Mart</h3>
+                        <p class="text-slate-300 leading-relaxed text-sm">
+                            Pusat retail (minimarket) yang menyediakan kebutuhan pokok mahasiswa, makanan/minuman, alat tulis, hingga merchandise resmi kampus. Mengedepankan harga mahasiswa dengan kualitas pelayanan prima.
+                        </p>
+                    </div>
+                    <!-- Tombol Kepoin Lebih Lanjut -->
+                    <div class="mt-auto pt-6">
+                        <a href="katalog-usaha.html#mart" class="inline-flex items-center gap-2 text-um-yellow hover:text-white font-semibold transition group text-sm">
+                            Kepoin lebih lanjut <i class="fas fa-arrow-right group-hover:translate-x-1 transition"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Kopma Rental -->
+                <div class="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 hover:-translate-y-2 transition duration-300 flex flex-col h-full">
+                    <div>
+                        <div class="w-16 h-16 bg-um-yellow text-um-blue rounded-2xl flex items-center justify-center text-3xl mb-6 shadow-xl">
+                            <i class="fas fa-box-open"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-white mb-3">Kopma Rental</h3>
+                        <p class="text-slate-300 leading-relaxed text-sm">
+                            Solusi penyewaan alat terlengkap untuk event mahasiswa maupun UKM lain. Melayani sewa LCD Proyektor, HT (Handy Talky), sound system, karpet, hingga perlengkapan outdoor dengan syarat mudah.
+                        </p>
+                    </div>
+                    <!-- Tombol Kepoin Lebih Lanjut -->
+                    <div class="mt-auto pt-6">
+                        <a href="katalog-usaha.html#rental" class="inline-flex items-center gap-2 text-um-yellow hover:text-white font-semibold transition group text-sm">
+                            Kepoin lebih lanjut <i class="fas fa-arrow-right group-hover:translate-x-1 transition"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Kopma Print -->
+                <div class="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 hover:-translate-y-2 transition duration-300 flex flex-col h-full">
+                    <div>
+                        <div class="w-16 h-16 bg-um-yellow text-um-blue rounded-2xl flex items-center justify-center text-3xl mb-6 shadow-xl">
+                            <i class="fas fa-print"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-white mb-3">Kopma Print</h3>
+                        <p class="text-slate-300 leading-relaxed text-sm">
+                            Layanan percetakan dan digital printing terpadu. Membantu mahasiswa cetak dokumen, jilid skripsi, pembuatan banner acara, ID card, stiker, hingga sertifikat dengan proses cepat dan harga kompetitif.
+                        </p>
+                    </div>
+                    <!-- Tombol Kepoin Lebih Lanjut -->
+                    <div class="mt-auto pt-6">
+                        <a href="katalog-usaha.html#print" class="inline-flex items-center gap-2 text-um-yellow hover:text-white font-semibold transition group text-sm">
+                            Kepoin lebih lanjut <i class="fas fa-arrow-right group-hover:translate-x-1 transition"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 8. Prestasi (Achievements) -->
+    <section class="py-20 bg-um-blue text-white overflow-hidden relative">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Jejak Prestasi Kami</h2>
+                <div class="w-20 h-1.5 bg-um-yellow mx-auto rounded-full"></div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="max-w-4xl mx-auto">
+                <div class="border-l-2 border-um-yellow pl-8 space-y-10 py-4 ml-4 md:ml-0">
+                    
+                    <div class="relative">
+                        <div class="absolute -left-[41px] w-5 h-5 bg-um-yellow rounded-full ring-4 ring-um-blue"></div>
+                        <span class="text-um-yellow font-bold text-lg mb-1 block">Tahun 2025</span>
+                        <h4 class="text-2xl font-bold text-white mb-2">Juara 1 Koperasi Pemuda Berprestasi Tingkat Provinsi Jawa Timur</h4>
+                        <p class="text-slate-300">Diberikan oleh Dinas Koperasi dan UKM Provinsi Jawa Timur atas inovasi digitalisasi unit usaha Kopma Mart.</p>
+                    </div>
+
+                    <div class="relative">
+                        <div class="absolute -left-[41px] w-5 h-5 bg-um-yellow rounded-full ring-4 ring-um-blue"></div>
+                        <span class="text-um-yellow font-bold text-lg mb-1 block">Tahun 2024</span>
+                        <h4 class="text-2xl font-bold text-white mb-2">Gold Medalist - National Business Plan Competition</h4>
+                        <p class="text-slate-300">Tim delegasi Bidang Usaha Kopma UM memenangkan kompetisi rancangan bisnis nasional di Universitas Indonesia.</p>
+                    </div>
+
+                    <div class="relative">
+                        <div class="absolute -left-[41px] w-5 h-5 bg-um-yellow rounded-full ring-4 ring-um-blue"></div>
+                        <span class="text-um-yellow font-bold text-lg mb-1 block">Tahun 2023</span>
+                        <h4 class="text-2xl font-bold text-white mb-2">UKM Terfavorit Universitas Negeri Malang</h4>
+                        <p class="text-slate-300">Meraih voting terbanyak dari mahasiswa baru pada acara Pengenalan Kehidupan Kampus bagi Mahasiswa Baru (PKKMB).</p>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 9. Galeri Kegiatan -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold text-um-blue mb-4">Galeri Momen Kopma UM</h2>
+                <div class="w-20 h-1.5 bg-um-yellow mx-auto rounded-full"></div>
+            </div>
+            
+            <!-- Simple Masonry-like Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <img src="https://images.unsplash.com/photo-1528605248644-14dd04022da1?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Makrab" class="rounded-xl w-full h-48 object-cover hover:opacity-80 transition cursor-pointer">
+                <img src="https://images.unsplash.com/photo-1577415124228-28111956551b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Meeting" class="rounded-xl w-full h-48 object-cover hover:opacity-80 transition cursor-pointer">
+                <img src="https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Teamwork" class="rounded-xl w-full h-48 object-cover hover:opacity-80 transition cursor-pointer md:col-span-2">
+                <img src="https://images.unsplash.com/photo-1531482615713-2afd69097998?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="Seminar" class="rounded-xl w-full h-64 object-cover hover:opacity-80 transition cursor-pointer md:col-span-2">
+                <img src="https://images.unsplash.com/photo-1552664730-d307ca884978?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Discussion" class="rounded-xl w-full h-64 object-cover hover:opacity-80 transition cursor-pointer">
+                <img src="https://images.unsplash.com/photo-1558402529-d2638a7023e9?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Event" class="rounded-xl w-full h-64 object-cover hover:opacity-80 transition cursor-pointer">
+            </div>
+            
+            <div class="text-center mt-10">
+                <a href="#" class="inline-flex items-center gap-2 text-um-blue font-bold hover:text-um-yellow transition">
+                    <i class="fab fa-instagram text-xl"></i> Lihat lebih banyak di Instagram kami
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- 10. Footer / Contact Us (Konsisten dengan index) -->
+    <footer class="bg-slate-900 text-slate-300 pt-20 pb-10 border-t-4 border-um-yellow">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
+                
+                <!-- Branding & Socials -->
+                <div class="col-span-1 md:col-span-2">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 bg-um-blue rounded-full flex items-center justify-center text-white font-bold border-2 border-slate-700">
+                            UM
+                        </div>
+                        <span class="text-2xl font-bold text-white font-heading">KOPMA UM</span>
+                    </div>
+                    <p class="text-slate-400 mb-6 max-w-sm">
+                        Koperasi Mahasiswa Universitas Negeri Malang. Mengabdi, Berkarya, dan Berprestasi untuk kemajuan bersama.
+                    </p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-um-yellow hover:text-um-blue transition shadow-lg">
+                            <i class="fab fa-instagram"></i>
+                        </a>
+                        <a href="#" class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-um-yellow hover:text-um-blue transition shadow-lg">
+                            <i class="fab fa-tiktok"></i>
+                        </a>
+                        <a href="#" class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-um-yellow hover:text-um-blue transition shadow-lg">
+                            <i class="fab fa-linkedin-in"></i>
+                        </a>
+                        <a href="#" class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-um-yellow hover:text-um-blue transition shadow-lg">
+                            <i class="fab fa-youtube"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Quick Links -->
+                <div>
+                    <h4 class="text-white font-bold font-heading mb-6">Tautan Cepat</h4>
+                    <ul class="space-y-3">
+                        <li><a href="index.html" class="hover:text-um-yellow transition">Beranda Utama</a></li>
+                        <li><a href="#" class="hover:text-um-yellow transition text-um-yellow">Profil Organisasi</a></li>
+                        <li><a href="index.html#unit-usaha" class="hover:text-um-yellow transition">Unit Usaha (Kopma Mart, dll)</a></li>
+                        <li><a href="index.html#daftar" class="hover:text-um-yellow transition">Pendaftaran Anggota</a></li>
+                    </ul>
+                </div>
+
+                <!-- Informasi Kontak -->
+                <div>
+                    <h4 class="text-white font-bold font-heading mb-6">Hubungi Kami</h4>
+                    <ul class="space-y-4">
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-map-marker-alt text-um-yellow mt-1"></i>
+                            <span class="text-sm">Gedung UKM Universitas Negeri Malang, Lantai 1.<br>Jl. Semarang No.5, Malang.</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <i class="fas fa-envelope text-um-yellow"></i>
+                            <span class="text-sm">kopma@um.ac.id</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <i class="fab fa-whatsapp text-um-yellow"></i>
+                            <span class="text-sm">+62 812-3456-7890 (Humas)</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="border-t border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center text-sm">
+                <p>&copy; 2026 Koperasi Mahasiswa Universitas Negeri Malang. All rights reserved.</p>
+                <div class="mt-4 md:mt-0 space-x-4">
+                    <a href="#" class="hover:text-white transition">Privacy Policy</a>
+                    <a href="#" class="hover:text-white transition">FAQ Mahasiswa Baru</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
