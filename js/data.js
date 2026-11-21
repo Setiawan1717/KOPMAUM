@@ -24,26 +24,26 @@ const PHI_ROLES = ['ketua', 'sekretaris', 'bendahara'];
 const PERIODE = '2026/2027';
 
 function seed() {
-  const P = (id, nama, nim, prodi, angkatan, wa, status, bidang, pendamping, bergabung) =>
-    ({ id, nama, nim, email: nama.split(' ')[0].toLowerCase() + '@kopma.um.ac.id', prodi, angkatan, wa, status, bidang, pendampingId: pendamping, bergabung, aktif: true });
+  const P = (id, nama, nia, prodi, angkatan, wa, status, bidang, pendamping, bergabung) =>
+    ({ id, nama, nia, email: nama.split(' ')[0].toLowerCase() + '@kopma.um.ac.id', prodi, angkatan, wa, status, bidang, pendampingId: pendamping, bergabung, aktif: true });
 
   const profil = [
-    P('u1', 'Raka Pratama',     '220535601101', 'Teknik Informatika',  2022, '0812-3301-1101', 'pengurus', 'Administrasi & IT', null, '2022-09-12'),
-    P('u2', 'Nadia Putri',      '220412602202', 'Manajemen',           2022, '0812-3301-2202', 'pengurus', 'PHI',               null, '2022-09-12'),
-    P('u3', 'Salsa Amelia',     '220413603303', 'Akuntansi',           2022, '0812-3301-3303', 'pengurus', 'PHI',               null, '2022-09-12'),
-    P('u4', 'Dimas Arya',       '230211604404', 'Ilmu Komunikasi',     2023, '0812-3301-4404', 'pengurus', 'PHI',               null, '2023-09-08'),
-    P('u5', 'Fajar Nugroho',    '230412605505', 'Kewirausahaan',       2023, '0812-3301-5505', 'pengurus', 'Usaha',             null, '2023-09-08'),
-    P('u6', 'Intan Maharani',   '230412606606', 'Manajemen',           2023, '0812-3301-6606', 'pengurus', 'Usaha',             null, '2023-09-08'),
-    P('u7', 'Bagus Setyo',      '230131607707', 'Pendidikan Biologi',  2023, '0812-3301-7707', 'pengurus', 'PSDA',              null, '2023-09-08'),
-    P('u8', 'Ayu Lestari',      '240311608808', 'Sastra Inggris',      2024, '0812-3301-8808', 'anggota',  null,                'u7', '2024-09-10'),
-    P('u9', 'Rizky Maulana',    '240535609909', 'Teknik Elektro',      2024, '0812-3301-9909', 'anggota',  null,                'u7', '2024-09-10'),
-    P('u10','Citra Wulandari',  '240412610010', 'Ekonomi Pembangunan', 2024, '0812-3302-0010', 'anggota',  null,                'u6', '2024-09-10'),
-    P('u11','Yoga Prasetyo',    '250131611111', 'Pendidikan Fisika',   2025, '0812-3302-1111', 'anggota',  null,                'u6', '2025-09-15'),
-    P('u12','Laras Anindita',   '250211612212', 'Psikologi',           2025, '0812-3302-2212', 'anggota',  null,                'u5', '2025-09-15'),
-    P('u13','Hendra Kusuma',    '250535613313', 'Teknik Mesin',        2025, '0812-3302-3313', 'anggota',  null,                'u5', '2025-09-15'),
-    P('u14','Putri Rahmawati',  '250311614414', 'Pendidikan Bahasa',   2025, '0812-3302-4414', 'anggota',  null,                'u4', '2025-09-15'),
-    P('u15','Galih Saputra',    '260412615515', 'Manajemen',           2026, '0812-3302-5515', 'anggota',  null,                'u4', '2026-09-14'),
-    P('u16','Nisa Azzahra',     '260131616616', 'Pendidikan Kimia',    2026, '0812-3302-6616', 'anggota',  null,                'u7', '2026-09-14'),
+    P('u1', 'Raka Pratama',     '2022.001', 'Teknik Informatika',  2022, '0812-3301-1101', 'pengurus', 'Administrasi & IT', null, '2022-09-12'),
+    P('u2', 'Nadia Putri',      '2022.002', 'Manajemen',           2022, '0812-3301-2202', 'pengurus', 'PHI',               null, '2022-09-12'),
+    P('u3', 'Salsa Amelia',     '2022.003', 'Akuntansi',           2022, '0812-3301-3303', 'pengurus', 'PHI',               null, '2022-09-12'),
+    P('u4', 'Dimas Arya',       '2023.004', 'Ilmu Komunikasi',     2023, '0812-3301-4404', 'pengurus', 'PHI',               null, '2023-09-08'),
+    P('u5', 'Fajar Nugroho',    '2023.005', 'Kewirausahaan',       2023, '0812-3301-5505', 'pengurus', 'Usaha',             null, '2023-09-08'),
+    P('u6', 'Intan Maharani',   '2023.006', 'Manajemen',           2023, '0812-3301-6606', 'pengurus', 'Usaha',             null, '2023-09-08'),
+    P('u7', 'Bagus Setyo',      '2023.007', 'Pendidikan Biologi',  2023, '0812-3301-7707', 'pengurus', 'PSDA',              null, '2023-09-08'),
+    P('u8', 'Ayu Lestari',      '2024.008', 'Sastra Inggris',      2024, '0812-3301-8808', 'anggota',  null,                'u7', '2024-09-10'),
+    P('u9', 'Rizky Maulana',    '2024.009', 'Teknik Elektro',      2024, '0812-3301-9909', 'anggota',  null,                'u7', '2024-09-10'),
+    P('u10','Citra Wulandari',  '2024.010', 'Ekonomi Pembangunan', 2024, '0812-3302-0010', 'anggota',  null,                'u6', '2024-09-10'),
+    P('u11','Yoga Prasetyo',    '2025.011', 'Pendidikan Fisika',   2025, '0812-3302-1111', 'anggota',  null,                'u6', '2025-09-15'),
+    P('u12','Laras Anindita',   '2025.012', 'Psikologi',           2025, '0812-3302-2212', 'anggota',  null,                'u5', '2025-09-15'),
+    P('u13','Hendra Kusuma',    '2025.013', 'Teknik Mesin',        2025, '0812-3302-3313', 'anggota',  null,                'u5', '2025-09-15'),
+    P('u14','Putri Rahmawati',  '2025.014', 'Pendidikan Bahasa',   2025, '0812-3302-4414', 'anggota',  null,                'u4', '2025-09-15'),
+    P('u15','Galih Saputra',    '2026.015', 'Manajemen',           2026, '0812-3302-5515', 'anggota',  null,                'u4', '2026-09-14'),
+    P('u16','Nisa Azzahra',     '2026.016', 'Pendidikan Kimia',    2026, '0812-3302-6616', 'anggota',  null,                'u7', '2026-09-14'),
   ];
 
   const roleMap = {
@@ -151,7 +151,7 @@ function hitungBiaya(item, ambil, kembali, unit) {
   return perUnit * unit;
 }
 
-const STORE_KEY = 'kopmahub-demo-v1';
+const STORE_KEY = 'kopmahub-demo-v2'; // v2: NIM diganti NIA
 const Store = {
   load() {
     try { const raw = localStorage.getItem(STORE_KEY); if (raw) return JSON.parse(raw); } catch (e) { /* abaikan */ }

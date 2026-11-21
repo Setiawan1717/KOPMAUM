@@ -1,6 +1,6 @@
 # Aturan keamanan Firestore (project kopma-um)
 
-`firestore.rules` mengunci database web kasir supaya aman dipakai bersama Kopma Hub. Aturan ini disusun dari semua operasi yang ada di kode web kasir, dan sudah diuji di Firestore Emulator: 20 alur kasir tetap jalan dan 17 percobaan penyalahgunaan ditolak. Web kasir versi perbaikan juga sudah diuji ujung ke ujung (login, jualan dengan NIM, stok berkurang) terhadap aturan ini.
+`firestore.rules` mengunci database web kasir supaya aman dipakai bersama Kopma Hub. Aturan ini disusun dari semua operasi yang ada di kode web kasir, dan sudah diuji di Firestore Emulator: 20 alur kasir tetap jalan dan 17 percobaan penyalahgunaan ditolak. Web kasir versi perbaikan juga sudah diuji ujung ke ujung (login, jualan dengan NIA, stok berkurang) terhadap aturan ini.
 
 ## Masalah yang ditutup
 

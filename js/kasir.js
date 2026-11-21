@@ -55,9 +55,9 @@ const Kasir = {
       fs.onSnapshot(fs.query(fs.collection(db, 'transactions'), fs.orderBy('tanggal', 'desc'), fs.limit(300)), once((s) => { this.transactions = s.docs.map((d) => ({ id: d.id, ...d.data() })); }), fail),
       fs.onSnapshot(fs.query(fs.collection(db, 'pengeluaran'), fs.orderBy('tanggal', 'desc'), fs.limit(300)), once((s) => { this.pengeluaran = s.docs.map((d) => ({ id: d.id, ...d.data() })); }), fail),
     );
-    // semua transaksi yang diisi NIM anggota (untuk poin) — tidak dibatasi 300 terakhir
+    // semua transaksi yang diisi NIA anggota (untuk poin) — tidak dibatasi 300 terakhir
     let poinPertama = true;
-    this._unsubs.push(fs.onSnapshot(fs.query(fs.collection(db, 'transactions'), fs.where('nimAnggota', '!=', null)),
+    this._unsubs.push(fs.onSnapshot(fs.query(fs.collection(db, 'transactions'), fs.where('niaAnggota', '!=', null)),
       (s) => { this.trxAnggota = s.docs.map((d) => ({ id: d.id, ...d.data() })); this.poinError = ''; if (poinPertama) { poinPertama = false; done(); } else this.onChange(); },
       (e) => { this.poinError = this._pesan(e); if (poinPertama) { poinPertama = false; done(); } else this.onChange(); }));
   },
@@ -127,18 +127,18 @@ const Kasir = {
     });
     return rows.filter((r) => r.waktu).sort((a, b) => String(b.waktu).localeCompare(String(a.waktu)));
   },
-  // poin per NIM dari transaksi kasir: floor(total / rpPerPoin) per transaksi
+  // poin per NIA dari transaksi kasir: floor(total / rpPerPoin) per transaksi
   poinPer(rpPerPoin) {
     const map = new Map();
     this.trxAnggota.forEach((t) => {
-      const nim = String(t.nimAnggota || '').trim(); if (!nim) return;
+      const nia = String(t.niaAnggota || '').replace(/\s+/g, '').toUpperCase(); if (!nia) return;
       const total = Number(t.total) || 0;
       const poin = Math.floor(total / Math.max(1, rpPerPoin));
-      const d = map.get(nim) || { nim, poin: 0, belanja: 0, n: 0, terakhir: '', riwayat: [] };
+      const d = map.get(nia) || { nia, poin: 0, belanja: 0, n: 0, terakhir: '', riwayat: [] };
       d.poin += poin; d.belanja += total; d.n++;
       if (String(t.tanggal) > d.terakhir) d.terakhir = String(t.tanggal);
       d.riwayat.push({ id: t.id, waktu: t.tanggal, total, poin, kasir: t.kasir || 'kasir', item: (t.item || []).length });
-      map.set(nim, d);
+      map.set(nia, d);
     });
     map.forEach((d) => d.riwayat.sort((a, b) => String(b.waktu).localeCompare(String(a.waktu))));
     return map;

@@ -63,7 +63,7 @@ const ui = {
 const save = () => Store.save(db);
 
 const me = () => db.profil.find((p) => p.id === meId);
-const prof = (id) => db.profil.find((p) => p.id === id) || { id: 'x', nama: 'Tidak dikenal', nim: '-' };
+const prof = (id) => db.profil.find((p) => p.id === id) || { id: 'x', nama: 'Tidak dikenal', nia: '-' };
 const rolesOf = (id) => db.peran.filter((r) => r.userId === id && r.aktif).map((r) => r.peran);
 const has = (...rs) => { const mine = rolesOf(meId); return rs.some((r) => mine.includes(r)); };
 const isPHI = () => has(...PHI_ROLES);
@@ -118,7 +118,8 @@ const NEXT = { Menunggu: ['Dikonfirmasi', 'Batal'], Dikonfirmasi: ['Diambil', 'B
 const NEXT_LABEL = { Dikonfirmasi: 'Konfirmasi', Diambil: 'Tandai diambil', Selesai: 'Tandai kembali', Batal: 'Batalkan' };
 
 /* ================= Logika lain ================= */
-const saldoPoin = (id) => (Kasir.on ? (Kasir.poinPer(db.pengaturan.rpPerPoin).get(prof(id).nim)?.poin || 0) : db.poin.filter((p) => p.userId === id).reduce((a, p) => a + p.poin, 0));
+const normNia = (v) => String(v || '').replace(/\s+/g, '').toUpperCase();
+const saldoPoin = (id) => (Kasir.on ? (Kasir.poinPer(db.pengaturan.rpPerPoin).get(prof(id).nia)?.poin || 0) : db.poin.filter((p) => p.userId === id).reduce((a, p) => a + p.poin, 0));
 const martItems = () => (Kasir.on ? Kasir.barang() : db.barangMart);
 const perluBelanja = () => martItems().filter((b) => b.stok < b.min);
 const stokBisaDiubah = () => can.stokEdit() && !Kasir.on;
@@ -177,7 +178,7 @@ function render() {
   afterRender();
 }
 function afterRender() {
-  if (ui.view === 'poin' && $('#nimInput') && document.activeElement === document.body) { /* jangan fokus otomatis di HP */ }
+  if (ui.view === 'poin' && $('#niaInput') && document.activeElement === document.body) { /* jangan fokus otomatis di HP */ }
 }
 
 function pageHead(title, sub, actions = '') {
@@ -214,9 +215,9 @@ function viewLogin() {
     </section>
     <section class="login-form c-sky">
       <div class="inner">
-        <div style="display:grid;gap:6px"><h2 style="font-size:1.6rem">Masuk</h2><p class="muted">Pakai email atau NIM dan kata sandi akunmu.</p></div>
+        <div style="display:grid;gap:6px"><h2 style="font-size:1.6rem">Masuk</h2><p class="muted">Pakai email atau NIA dan kata sandi akunmu.</p></div>
         <form class="form" data-form="login" id="loginForm">
-          <div class="field"><label for="loginId">Email atau NIM</label><input class="input" id="loginId" name="id" autocomplete="username" placeholder="contoh: 230412606606" required></div>
+          <div class="field"><label for="loginId">Email atau NIA</label><input class="input" id="loginId" name="id" autocomplete="username" placeholder="contoh: 2023.006" required></div>
           <div class="field"><label for="loginPass">Kata sandi</label><input class="input" id="loginPass" name="pass" type="password" autocomplete="current-password" placeholder="••••••••" required></div>
           <div id="loginMsg"></div>
           <button class="btn btn-primary" type="submit">Masuk</button>
@@ -295,7 +296,7 @@ function viewDasbor() {
     </section>` : ''}
     <section class="card c-grape">
       <div class="card-head"><h2>Poin terakhirmu</h2><a href="#poin" class="btn btn-soft btn-sm">Riwayat</a></div>
-      <div class="list">${Kasir.on ? (riwayatPoinKasir(Kasir.poinPer(db.pengaturan.rpPerPoin).get(me().nim), 4) || empty('star', 'Belum ada belanja dengan NIM-mu. Sebutkan NIM saat bayar di kasir.')) : (poinRows(db.poin.filter((x) => x.userId === meId).slice(-4).reverse(), false) || empty('star', 'Belum ada belanja tercatat. Sebutkan NIM saat belanja di Kopma Mart.'))}</div>
+      <div class="list">${Kasir.on ? (riwayatPoinKasir(Kasir.poinPer(db.pengaturan.rpPerPoin).get(me().nia), 4) || empty('star', 'Belum ada belanja dengan NIA-mu. Sebutkan NIA saat bayar di kasir.')) : (poinRows(db.poin.filter((x) => x.userId === meId).slice(-4).reverse(), false) || empty('star', 'Belum ada belanja tercatat. Sebutkan NIA saat belanja di Kopma Mart.'))}</div>
     </section>
     ${dampingan.length ? `
     <section class="card c-sky">
@@ -310,7 +311,7 @@ function anggotaRow(p) {
   const lunas = simpananLunas(p.id);
   return `<div class="row click" data-act="profil" data-id="${p.id}" role="button" tabindex="0">
     ${avatar(p)}
-    <div class="grow"><div class="title">${esc(p.nama)}</div><div class="sub num">${esc(p.nim)} · ${esc(p.prodi)} ’${String(p.angkatan).slice(2)}</div></div>
+    <div class="grow"><div class="title">${esc(p.nama)}</div><div class="sub num">${esc(p.nia)} · ${esc(p.prodi)} ’${String(p.angkatan).slice(2)}</div></div>
     <div class="end">
       <span class="pill c-${p.status === 'pengurus' ? 'sky' : 'mint'}">${p.status === 'pengurus' ? 'Pengurus' : 'Anggota'}</span>
       ${can.anggotaFull() ? `<span class="pill c-${lunas ? 'lime' : 'coral'} plain small">${lunas ? 'Simpanan lunas' : 'Simpanan belum'}</span>` : ''}
@@ -319,14 +320,14 @@ function anggotaRow(p) {
 }
 function listAnggota() {
   const q = (ui.q.anggota || '').toLowerCase().trim();
-  if (!can.anggotaFull() && q.length < 3) return empty('search', 'Ketik minimal 3 huruf nama atau NIM untuk mencari anggota.');
-  let rows = db.profil.filter((p) => !q || p.nama.toLowerCase().includes(q) || p.nim.includes(q));
+  if (!can.anggotaFull() && q.length < 3) return empty('search', 'Ketik minimal 3 huruf nama atau NIA untuk mencari anggota.');
+  let rows = db.profil.filter((p) => !q || p.nama.toLowerCase().includes(q) || p.nia.toLowerCase().includes(q));
   const f = ui.anggotaFilter;
   if (f === 'pengurus') rows = rows.filter((p) => p.status === 'pengurus');
   if (f === 'anggota') rows = rows.filter((p) => p.status === 'anggota');
   if (f === 'belum') rows = rows.filter((p) => !simpananLunas(p.id));
   if (f === 'dampingan') rows = rows.filter((p) => p.pendampingId === meId);
-  return rows.length ? rows.map(anggotaRow).join('') : empty('search', 'Tidak ada anggota yang cocok. Coba nama atau NIM lain.');
+  return rows.length ? rows.map(anggotaRow).join('') : empty('search', 'Tidak ada anggota yang cocok. Coba nama atau NIA lain.');
 }
 function viewAnggota() {
   if (!can.anggotaView()) return viewProfilSaya();
@@ -340,7 +341,7 @@ function viewAnggota() {
   ${pageHead('Data anggota', 'Setiap anggota punya satu pengurus pendamping, jadi tidak ada yang hanya tercatat di atas kertas.',
     `${exportBtn('anggota')}${can.anggotaEdit() ? `<button class="btn btn-primary" data-act="anggota-form">${ic('plus', 'icon-sm')}Tambah anggota</button>` : ''}`)}
   <div class="toolbar">
-    <div class="search">${ic('search')}<input class="input" id="qAnggota" data-live="anggota" placeholder="Cari nama atau NIM…" value="${esc(ui.q.anggota || '')}" aria-label="Cari anggota" inputmode="search"></div>
+    <div class="search">${ic('search')}<input class="input" id="qAnggota" data-live="anggota" placeholder="Cari nama atau NIA…" value="${esc(ui.q.anggota || '')}" aria-label="Cari anggota" inputmode="search"></div>
   </div>
   ${can.anggotaFull() ? `<div class="chips">${filters.map(([k, l]) => `<button class="chip ${ui.anggotaFilter === k ? 'on' : ''}" data-act="anggota-filter" data-k="${k}">${l}<span class="count num">${counts[k]}</span></button>`).join('')}</div>` : ''}
   <div class="list" id="listAnggota">${listAnggota()}</div>`;
@@ -356,7 +357,7 @@ function profilDetail(p) {
   const bisaWA = can.anggotaFull() || p.id === meId;
   return `
   <section class="card">
-    <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">${avatar(p, 56)}<div><h2>${esc(p.nama)}</h2><p class="muted num">${esc(p.nim)}</p></div></div>
+    <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">${avatar(p, 56)}<div><h2>${esc(p.nama)}</h2><p class="muted num">${esc(p.nia)}</p></div></div>
     <dl class="kv">
       <dt>Prodi</dt><dd>${esc(p.prodi)}</dd>
       <dt>Angkatan</dt><dd class="num">${p.angkatan}</dd>
@@ -564,48 +565,48 @@ function riwayatPoinKasir(d, max = 50) {
   if (!d || !d.riwayat.length) return '';
   return d.riwayat.slice(0, max).map((r) => `<div class="row"><span class="stripe c-grape"></span><div class="grow"><div class="title">Belanja ${rp(r.total)}</div><div class="sub">${r.item} barang · kasir ${esc(r.kasir)} · ${waktu(r.waktu)}</div></div><div class="end"><b class="num" style="font-size:1.1rem;color:var(--grape-ink)">+${fmtNum(r.poin)}</b></div></div>`).join('');
 }
-function kartuPoinNim(nim, d) {
-  const p = db.profil.find((x) => x.nim === nim);
+function kartuPoinNia(nia, d) {
+  const p = db.profil.find((x) => x.nia === nia);
   return `<section class="card c-grape" style="background:linear-gradient(135deg,var(--grape-soft),var(--pink-soft))">
-    <span class="eyebrow">${p ? esc(p.nama) + ' · ' : ''}NIM <span class="num">${esc(nim)}</span></span>
+    <span class="eyebrow">${p ? esc(p.nama) + ' · ' : ''}NIA <span class="num">${esc(nia)}</span></span>
     <div class="bignum num" style="color:var(--grape-ink)">${fmtNum(d?.poin || 0)}</div>
-    <p class="muted small" style="margin-top:8px">${d ? `Dari ${d.n} kali belanja senilai ${rp(d.belanja)}. Terakhir ${waktu(d.terakhir)}.` : 'Belum ada belanja dengan NIM ini di kasir.'}</p>
+    <p class="muted small" style="margin-top:8px">${d ? `Dari ${d.n} kali belanja senilai ${rp(d.belanja)}. Terakhir ${waktu(d.terakhir)}.` : 'Belum ada belanja dengan NIA ini di kasir.'}</p>
   </section>
   ${d ? `<section class="card"><div class="card-head"><h3>Riwayat poin</h3></div><div class="list">${riwayatPoinKasir(d)}</div></section>` : ''}`;
 }
 function viewPoinKasir() {
   const rate = db.pengaturan.rpPerPoin;
   const data = Kasir.poinPer(rate);
-  const tabs = [['saya', 'Poin saya'], ['cek', 'Cek NIM'], ...(can.poinAll() ? [['semua', 'Semua anggota']] : [])];
+  const tabs = [['saya', 'Poin saya'], ['cek', 'Cek NIA'], ...(can.poinAll() ? [['semua', 'Semua anggota']] : [])];
   if (!tabs.find((t) => t[0] === ui.poinTab)) ui.poinTab = 'saya';
   let body = '';
   if (ui.poinTab === 'saya') {
-    body = `<div class="grid grid-2">${kartuPoinNim(me().nim, data.get(me().nim))}</div>`;
+    body = `<div class="grid grid-2">${kartuPoinNia(me().nia, data.get(me().nia))}</div>`;
   } else if (ui.poinTab === 'cek') {
-    body = `<section class="card c-grape" style="max-width:620px"><div class="field"><label for="cekNim">NIM anggota</label>
-      <div class="search">${ic('search')}<input class="input input-lg num" id="cekNim" data-live="ceknim" inputmode="numeric" placeholder="Ketik NIM…" value="${esc(ui.q.ceknim || '')}"></div>
+    body = `<section class="card c-grape" style="max-width:620px"><div class="field"><label for="cekNia">NIA anggota</label>
+      <div class="search">${ic('search')}<input class="input input-lg num" id="cekNia" data-live="ceknia" autocapitalize="characters" placeholder="Ketik NIA…" value="${esc(ui.q.ceknia || '')}"></div>
       <span class="hint">Cocok untuk menjawab anggota yang bertanya "poinku berapa?"</span></div></section>
-      <div class="grid grid-2" id="cekHasil">${hasilCekNim()}</div>`;
+      <div class="grid grid-2" id="cekHasil">${hasilCekNia()}</div>`;
   } else {
     const rank = [...data.values()].sort((a, b) => b.poin - a.poin);
     const max = Math.max(1, rank[0]?.poin || 1);
     const colors = ['grape', 'pink', 'sky', 'tangerine', 'lime', 'mint', 'sun', 'coral'];
     body = `
     ${can.poinRumus() ? `<section class="card c-sun"><form class="toolbar" data-form="rumus"><div class="field" style="flex:1 1 220px"><label for="rateInput">Rumus poin (bendahara)</label><div class="toolbar"><span>1 poin setiap</span><input class="input num" id="rateInput" name="rate" type="number" min="100" step="100" value="${rate}" style="max-width:140px"><span>rupiah</span></div><span class="hint">Berlaku untuk semua transaksi, termasuk yang lama, karena poin dihitung ulang dari data kasir.</span></div><button class="btn btn-primary" type="submit">Simpan rumus</button></form></section>` : ''}
-    <section class="card c-grape"><div class="card-head"><h2>Peringkat poin</h2><span class="pill">${rank.length} NIM</span></div>
-      <div class="list">${rank.length ? rank.map((d, i) => { const p = db.profil.find((x) => x.nim === d.nim); return `<div class="row click" data-act="lihat-nim" data-nim="${esc(d.nim)}" role="button" tabindex="0"><span class="avatar c-${colors[i % colors.length]}" style="width:34px;height:34px">${i + 1}</span><div class="grow"><div class="title">${p ? esc(p.nama) : `<span class="num">${esc(d.nim)}</span>`}</div><div class="sub">${p ? `<span class="num">${esc(d.nim)}</span> · ` : 'Belum terdaftar di Kopma Hub · '}${d.n}× belanja · ${rp(d.belanja)}</div><div class="meter c-${colors[i % colors.length]}" style="margin-top:6px"><i style="width:${Math.round((d.poin / max) * 100)}%"></i></div></div><div class="end"><b class="num">${fmtNum(d.poin)}</b></div></div>`; }).join('') : empty('star', 'Belum ada transaksi kasir yang diisi NIM anggota.', 'grape')}</div>
+    <section class="card c-grape"><div class="card-head"><h2>Peringkat poin</h2><span class="pill">${rank.length} NIA</span></div>
+      <div class="list">${rank.length ? rank.map((d, i) => { const p = db.profil.find((x) => x.nia === d.nia); return `<div class="row click" data-act="lihat-nia" data-nia="${esc(d.nia)}" role="button" tabindex="0"><span class="avatar c-${colors[i % colors.length]}" style="width:34px;height:34px">${i + 1}</span><div class="grow"><div class="title">${p ? esc(p.nama) : `<span class="num">${esc(d.nia)}</span>`}</div><div class="sub">${p ? `<span class="num">${esc(d.nia)}</span> · ` : 'Belum terdaftar di Kopma Hub · '}${d.n}× belanja · ${rp(d.belanja)}</div><div class="meter c-${colors[i % colors.length]}" style="margin-top:6px"><i style="width:${Math.round((d.poin / max) * 100)}%"></i></div></div><div class="end"><b class="num">${fmtNum(d.poin)}</b></div></div>`; }).join('') : empty('star', 'Belum ada transaksi kasir yang diisi NIA anggota.', 'grape')}</div>
     </section>`;
   }
-  return `${pageHead('Poin anggota', 'Poin tercatat otomatis setiap kasir mengisi NIM anggota saat pembayaran.', exportBtn('poin'))}
-  <div class="notice c-mint">${ic('check')}<span>Tersambung ke kasir. ${rp(rate)} belanja = 1 poin, dihitung per transaksi. Transaksi sebelum ada isian NIM tidak dihitung.</span></div>
+  return `${pageHead('Poin anggota', 'Poin tercatat otomatis setiap kasir mengisi NIA anggota saat pembayaran.', exportBtn('poin'))}
+  <div class="notice c-mint">${ic('check')}<span>Tersambung ke kasir. ${rp(rate)} belanja = 1 poin, dihitung per transaksi. Transaksi sebelum ada isian NIA tidak dihitung.</span></div>
   ${Kasir.poinError ? `<div class="notice c-coral">${ic('alert')}<span>Data poin gagal dimuat: ${esc(Kasir.poinError)}</span></div>` : ''}
   <div class="seg">${tabs.map(([k, l]) => `<button class="${ui.poinTab === k ? 'on' : ''}" data-act="poin-tab" data-k="${k}">${l}</button>`).join('')}</div>
   ${body}`;
 }
-function hasilCekNim() {
-  const nim = String(ui.q.ceknim || '').replace(/\D/g, '');
-  if (nim.length < 8) return empty('search', 'Ketik NIM lengkap untuk melihat poinnya.');
-  return kartuPoinNim(nim, Kasir.poinPer(db.pengaturan.rpPerPoin).get(nim));
+function hasilCekNia() {
+  const nia = normNia(ui.q.ceknia);
+  if (nia.length < 3) return empty('search', 'Ketik NIA lengkap untuk melihat poinnya.');
+  return kartuPoinNia(nia, Kasir.poinPer(db.pengaturan.rpPerPoin).get(nia));
 }
 
 function viewPoin() {
@@ -624,17 +625,17 @@ function viewPoin() {
         <p class="muted small" style="margin-top:8px">Dari ${mine.filter((x) => x.belanja).length} kali belanja senilai ${rp(totalBelanja)}. Setiap ${rp(rate)} belanja = 1 poin.</p>
         <p class="small" style="margin-top:10px"><b>Penukaran poin</b> menyusul di Fase 2.</p>
       </section>
-      <section class="card"><div class="card-head"><h2>Riwayat</h2></div><div class="list">${poinRows(mine, false) || empty('star', 'Belum ada poin. Sebutkan NIM setiap belanja di Kopma Mart.', 'grape')}</div></section>
+      <section class="card"><div class="card-head"><h2>Riwayat</h2></div><div class="list">${poinRows(mine, false) || empty('star', 'Belum ada poin. Sebutkan NIA setiap belanja di Kopma Mart.', 'grape')}</div></section>
     </div>`;
   } else if (ui.poinTab === 'catat') {
     body = `<section class="card c-grape" style="max-width:620px">
       <form class="form" data-form="poin" id="poinForm" autocomplete="off">
         <div class="card-head" style="margin:0"><h2>Catat belanja anggota</h2><span class="pill plain timer" id="poinTimer">0 dtk</span></div>
-        <div class="field"><label for="nimInput">NIM atau nama anggota</label>
-          <div class="search">${ic('search')}<input class="input input-lg num" id="nimInput" data-live="nim" inputmode="numeric" placeholder="Ketik NIM…" aria-describedby="nimHint"></div>
+        <div class="field"><label for="niaInput">NIA atau nama anggota</label>
+          <div class="search">${ic('search')}<input class="input input-lg num" id="niaInput" data-live="nia" autocapitalize="characters" placeholder="Ketik NIA…" aria-describedby="niaHint"></div>
           <input type="hidden" name="userId" id="poinUser">
-          <div class="suggest" id="nimSuggest"></div>
-          <span class="hint" id="nimHint">Pilih anggota dari daftar yang muncul.</span>
+          <div class="suggest" id="niaSuggest"></div>
+          <span class="hint" id="niaHint">Pilih anggota dari daftar yang muncul.</span>
         </div>
         <div class="field"><label for="nominalInput">Nominal belanja</label>
           <input class="input input-lg num" id="nominalInput" name="nominal" data-live="nominal" type="number" min="0" step="500" inputmode="numeric" placeholder="0">
@@ -712,13 +713,13 @@ function viewFee() {
 /* ---------- Akun & peran ---------- */
 function viewAkun() {
   const q = (ui.q.akun || '').toLowerCase();
-  const rows = db.profil.filter((p) => !q || p.nama.toLowerCase().includes(q) || p.nim.includes(q) || p.email.includes(q));
+  const rows = db.profil.filter((p) => !q || p.nama.toLowerCase().includes(q) || p.nia.toLowerCase().includes(q) || p.email.includes(q));
   return `${pageHead('Akun & peran', can.akunEdit() ? 'Buat akun, atur peran, dan serah terima saat ganti periode.' : 'Kamu bisa melihat daftar akun. Perubahan hanya oleh super admin.',
     can.akunEdit() ? `<button class="btn btn-ghost" data-act="ganti-periode">${ic('refresh', 'icon-sm')}Ganti periode</button><button class="btn btn-primary" data-act="akun-form">${ic('plus', 'icon-sm')}Buat akun</button>` : '')}
-  <div class="toolbar"><div class="search">${ic('search')}<input class="input" data-live="akun" placeholder="Cari nama, NIM, atau email…" value="${esc(ui.q.akun || '')}" aria-label="Cari akun"></div></div>
+  <div class="toolbar"><div class="search">${ic('search')}<input class="input" data-live="akun" placeholder="Cari nama, NIA, atau email…" value="${esc(ui.q.akun || '')}" aria-label="Cari akun"></div></div>
   <div class="list" id="listAkun">${rows.map((p) => {
     const rs = rolesOf(p.id);
-    return `<div class="row" style="${p.aktif ? '' : 'opacity:.55'}">${avatar(p)}<div class="grow"><div class="title">${esc(p.nama)} ${p.aktif ? '' : '<span class="pill c-coral">Nonaktif</span>'}</div><div class="sub">${esc(p.email)} · <span class="num">${esc(p.nim)}</span></div><div class="chips" style="margin-top:6px">${rs.map((r) => `<span class="pill c-${ROLES[r].color}">${ROLES[r].label}</span>`).join('')}</div></div>
+    return `<div class="row" style="${p.aktif ? '' : 'opacity:.55'}">${avatar(p)}<div class="grow"><div class="title">${esc(p.nama)} ${p.aktif ? '' : '<span class="pill c-coral">Nonaktif</span>'}</div><div class="sub">${esc(p.email)} · <span class="num">${esc(p.nia)}</span></div><div class="chips" style="margin-top:6px">${rs.map((r) => `<span class="pill c-${ROLES[r].color}">${ROLES[r].label}</span>`).join('')}</div></div>
     ${can.akunEdit() ? `<div class="end"><button class="btn btn-soft btn-sm" data-act="peran-form" data-id="${p.id}">${ic('key', 'icon-sm')}Peran</button>${p.id !== meId ? `<button class="btn btn-ghost btn-sm" data-act="akun-toggle" data-id="${p.id}">${p.aktif ? 'Nonaktifkan' : 'Aktifkan'}</button>` : ''}</div>` : ''}</div>`;
   }).join('')}</div>`;
 }
@@ -895,7 +896,7 @@ const ACT = {
     openModal(p ? 'Ubah data anggota' : 'Tambah anggota', `
     <form class="form" data-form="anggota" id="anggotaForm"><input type="hidden" name="id" value="${p?.id || ''}">
       <div class="field"><label for="agNama">Nama lengkap</label><input class="input" id="agNama" name="nama" required value="${esc(p?.nama || '')}"></div>
-      <div class="form-row"><div class="field"><label for="agNim">NIM</label><input class="input num" id="agNim" name="nim" required inputmode="numeric" value="${esc(p?.nim || '')}"></div><div class="field"><label for="agAngkatan">Angkatan</label><input class="input num" id="agAngkatan" name="angkatan" type="number" required value="${p?.angkatan || new Date().getFullYear()}"></div></div>
+      <div class="form-row"><div class="field"><label for="agNia">NIA</label><input class="input num" id="agNia" name="nia" required autocapitalize="characters" value="${esc(p?.nia || '')}"></div><div class="field"><label for="agAngkatan">Angkatan</label><input class="input num" id="agAngkatan" name="angkatan" type="number" required value="${p?.angkatan || new Date().getFullYear()}"></div></div>
       <div class="field"><label for="agProdi">Prodi</label><input class="input" id="agProdi" name="prodi" required value="${esc(p?.prodi || '')}"></div>
       <div class="form-row"><div class="field"><label for="agWa">Nomor WA</label><input class="input num" id="agWa" name="wa" inputmode="tel" value="${esc(p?.wa || '')}"></div><div class="field"><label for="agStatus">Status</label><select class="input" id="agStatus" name="status"><option value="anggota" ${p?.status === 'anggota' ? 'selected' : ''}>Anggota</option><option value="pengurus" ${p?.status === 'pengurus' ? 'selected' : ''}>Pengurus</option></select></div></div>
       <div class="form-row"><div class="field"><label for="agBidang">Bidang (pengurus)</label><input class="input" id="agBidang" name="bidang" value="${esc(p?.bidang || '')}" placeholder="Usaha, PSDA, …"></div><div class="field"><label for="agPend">Pengurus pendamping</label><select class="input" id="agPend" name="pendampingId"><option value="">— Tidak ada —</option>${pengurus.map((x) => `<option value="${x.id}" ${p?.pendampingId === x.id ? 'selected' : ''}>${esc(x.nama)}</option>`).join('')}</select></div></div>
@@ -945,8 +946,8 @@ const ACT = {
 
   'poin-tab': (el) => { ui.poinTab = el.dataset.k; ui.poinTimer = null; render(); },
   'nominal-cepat': (el) => { const i = $('#nominalInput'); i.value = el.dataset.n; startTimer(); previewPoin(); },
-  'pilih-anggota': (el) => { const p = prof(el.dataset.id); $('#poinUser').value = p.id; $('#nimInput').value = `${p.nim} · ${p.nama}`; $('#nimSuggest').innerHTML = `<div class="notice c-grape">${avatar(p, 30)}<span>${esc(p.nama)}<br><span class="small">Saldo sekarang ${fmtNum(saldoPoin(p.id))} poin</span></span></div>`; $('#nominalInput').focus(); previewPoin(); },
-  'lihat-nim': (el) => { ui.q.ceknim = el.dataset.nim; ui.poinTab = 'cek'; render(); window.scrollTo(0, 0); },
+  'pilih-anggota': (el) => { const p = prof(el.dataset.id); $('#poinUser').value = p.id; $('#niaInput').value = `${p.nia} · ${p.nama}`; $('#niaSuggest').innerHTML = `<div class="notice c-grape">${avatar(p, 30)}<span>${esc(p.nama)}<br><span class="small">Saldo sekarang ${fmtNum(saldoPoin(p.id))} poin</span></span></div>`; $('#nominalInput').focus(); previewPoin(); },
+  'lihat-nia': (el) => { ui.q.ceknia = el.dataset.nia; ui.poinTab = 'cek'; render(); window.scrollTo(0, 0); },
   'poin-koreksi': (el) => {
     const p = prof(el.dataset.id);
     openModal(`Koreksi poin`, `<form class="form" data-form="koreksi" id="koreksiForm"><input type="hidden" name="userId" value="${p.id}">
@@ -969,7 +970,7 @@ const ACT = {
   'akun-form': () => openModal('Buat akun', `
     <form class="form" data-form="akun" id="akunForm">
       <div class="field"><label for="akNama">Nama lengkap</label><input class="input" id="akNama" name="nama" required></div>
-      <div class="form-row"><div class="field"><label for="akNim">NIM</label><input class="input num" id="akNim" name="nim" required inputmode="numeric"></div><div class="field"><label for="akEmail">Email</label><input class="input" id="akEmail" name="email" type="email" required></div></div>
+      <div class="form-row"><div class="field"><label for="akNia">NIA</label><input class="input num" id="akNia" name="nia" required autocapitalize="characters"></div><div class="field"><label for="akEmail">Email</label><input class="input" id="akEmail" name="email" type="email" required></div></div>
       <div class="field"><label for="akProdi">Prodi</label><input class="input" id="akProdi" name="prodi" required></div>
       <div class="field"><label>Peran</label><div class="chips">${Object.entries(ROLES).map(([k, r]) => `<label class="chip c-${r.color} ${k === 'anggota' ? 'on' : ''}"><input type="checkbox" name="peran" value="${k}" ${k === 'anggota' ? 'checked' : ''} data-live="rolechip" style="position:absolute;opacity:0;width:0">${r.label}</label>`).join('')}</div><span class="hint">Kata sandi awal dikirim ke email. Untuk demo: kopma123.</span></div>
     </form>`, 'mint', `<button class="btn btn-ghost" data-act="close-modal">Batal</button><button class="btn btn-primary" form="akunForm" type="submit">Buat akun</button>`),
@@ -1010,10 +1011,10 @@ const ACT = {
   export: (el) => {
     const k = el.dataset.kind;
     const T = {
-      anggota: [['Nama', 'NIM', 'Prodi', 'Angkatan', 'WA', 'Status', 'Bidang', 'Pendamping', 'Simpanan lunas'], db.profil.map((p) => [p.nama, p.nim, p.prodi, p.angkatan, p.wa, p.status, p.bidang || '', p.pendampingId ? prof(p.pendampingId).nama : '', simpananLunas(p.id) ? 'Ya' : 'Belum'])],
+      anggota: [['Nama', 'NIA', 'Prodi', 'Angkatan', 'WA', 'Status', 'Bidang', 'Pendamping', 'Simpanan lunas'], db.profil.map((p) => [p.nama, p.nia, p.prodi, p.angkatan, p.wa, p.status, p.bidang || '', p.pendampingId ? prof(p.pendampingId).nama : '', simpananLunas(p.id) ? 'Ya' : 'Belum'])],
       stok: [['Barang', 'Kategori', 'Harga beli', 'Harga jual', 'Stok', 'Minimum'], martItems().map((b) => [b.nama, b.kategori, b.hargaBeli, b.hargaJual, b.stok, b.min])],
       booking: [['Penyewa', 'WA', 'Barang', 'Unit', 'Ambil', 'Kembali', 'Total', 'Status'], db.booking.map((b) => [b.penyewa, b.wa, db.barangSewa.find((x) => x.id === b.barangId).nama, b.unit, b.ambil, b.kembali, b.total, b.status])],
-      poin: Kasir.on ? [['NIM', 'Nama', 'Jumlah belanja', 'Total belanja', 'Poin', 'Terakhir belanja'], [...Kasir.poinPer(db.pengaturan.rpPerPoin).values()].map((d) => [d.nim, db.profil.find((x) => x.nim === d.nim)?.nama || '', d.n, d.belanja, d.poin, d.terakhir])] : [['Anggota', 'NIM', 'Belanja', 'Poin', 'Alasan', 'Pencatat', 'Waktu'], db.poin.map((x) => [prof(x.userId).nama, prof(x.userId).nim, x.belanja, x.poin, x.alasan, prof(x.olehId).nama, x.waktu])],
+      poin: Kasir.on ? [['NIA', 'Nama', 'Jumlah belanja', 'Total belanja', 'Poin', 'Terakhir belanja'], [...Kasir.poinPer(db.pengaturan.rpPerPoin).values()].map((d) => [d.nia, db.profil.find((x) => x.nia === d.nia)?.nama || '', d.n, d.belanja, d.poin, d.terakhir])] : [['Anggota', 'NIA', 'Belanja', 'Poin', 'Alasan', 'Pencatat', 'Waktu'], db.poin.map((x) => [prof(x.userId).nama, prof(x.userId).nia, x.belanja, x.poin, x.alasan, prof(x.olehId).nama, x.waktu])],
       fee: [['Penerima', 'Jenis', 'Kegiatan', 'Nominal', 'Tanggal', 'Dibayar'], db.fee.map((f) => [prof(f.userId).nama, f.jenis, f.kegiatan, f.nominal, f.tanggal, f.lunas ? 'Ya' : 'Belum'])],
     }[k];
     const csv = [T[0], ...T[1]].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -1045,16 +1046,16 @@ const LIVE = {
   akun: (el) => { ui.q.akun = el.value; const v = el.value; render(); const i = document.querySelector('[data-live="akun"]'); i.focus(); i.setSelectionRange(v.length, v.length); },
   booking: previewBooking,
   mutasi: previewMutasi,
-  nim: (el) => {
+  nia: (el) => {
     startTimer();
     $('#poinUser').value = '';
     const q = el.value.toLowerCase().trim();
-    const res = q.length < 2 ? [] : db.profil.filter((p) => p.aktif && (p.nim.includes(q) || p.nama.toLowerCase().includes(q))).slice(0, 5);
-    $('#nimSuggest').innerHTML = res.map((p) => `<button type="button" class="row click c-grape" data-act="pilih-anggota" data-id="${p.id}" style="text-align:left;font:inherit">${avatar(p, 32)}<span class="grow"><span class="title" style="display:block">${esc(p.nama)}</span><span class="sub num">${esc(p.nim)}</span></span></button>`).join('') || (q.length >= 2 ? `<span class="small muted">Tidak ada anggota dengan NIM atau nama itu.</span>` : '');
+    const res = q.length < 2 ? [] : db.profil.filter((p) => p.aktif && (p.nia.toLowerCase().includes(q) || p.nama.toLowerCase().includes(q))).slice(0, 5);
+    $('#niaSuggest').innerHTML = res.map((p) => `<button type="button" class="row click c-grape" data-act="pilih-anggota" data-id="${p.id}" style="text-align:left;font:inherit">${avatar(p, 32)}<span class="grow"><span class="title" style="display:block">${esc(p.nama)}</span><span class="sub num">${esc(p.nia)}</span></span></button>`).join('') || (q.length >= 2 ? `<span class="small muted">Tidak ada anggota dengan NIA atau nama itu.</span>` : '');
     previewPoin();
   },
   nominal: () => { startTimer(); previewPoin(); },
-  ceknim: (el) => { ui.q.ceknim = el.value; $('#cekHasil').innerHTML = hasilCekNim(); },
+  ceknia: (el) => { ui.q.ceknia = el.value; $('#cekHasil').innerHTML = hasilCekNia(); },
   opname: () => {
     let n = 0, beda = 0;
     document.querySelectorAll('[data-live="opname"]').forEach((i) => {
@@ -1073,7 +1074,7 @@ const LIVE = {
 /* ================= Submit form ================= */
 const FORM = {
   login: (f) => {
-    const id = f.id.value.trim().toLowerCase(); const p = db.profil.find((x) => x.email.toLowerCase() === id || x.nim === id);
+    const id = f.id.value.trim().toLowerCase(); const p = db.profil.find((x) => x.email.toLowerCase() === id || x.nia.toLowerCase() === id);
     const msg = $('#loginMsg');
     if (!p || f.pass.value !== 'kopma123') { msg.innerHTML = `<div class="notice c-coral">${ic('alert')}<span>Halaman ini masih mode demo, jadi akun kasir belum bisa dipakai di sini. Pilih salah satu akun demo di bawah, lalu sambungkan akun kasir lewat menu <b>Stok Mart</b>.</span></div>`; return; }
     if (!p.aktif) { msg.innerHTML = `<div class="notice c-coral">${ic('alert')}<span>Akun ini sudah dinonaktifkan. Hubungi super admin.</span></div>`; return; }
@@ -1137,21 +1138,21 @@ const FORM = {
     db.fee.push(x); commit(`Fee ${rp(x.nominal)} untuk ${esc(prof(x.userId).nama.split(' ')[0])} tercatat`, 'pink', 'fee', `Fee ${x.jenis} ${prof(x.userId).nama}: ${x.kegiatan} ${rp(x.nominal)}`);
   },
   anggota: (f) => {
-    const data = { nama: f.nama.value.trim(), nim: f.nim.value.trim(), angkatan: +f.angkatan.value, prodi: f.prodi.value.trim(), wa: f.wa.value.trim(), status: f.status.value, bidang: f.bidang.value.trim() || null, pendampingId: f.pendampingId.value || null };
-    const dup = db.profil.find((p) => p.nim === data.nim && p.id !== f.id.value);
-    if (dup) { toast(`NIM ${esc(data.nim)} sudah dipakai ${esc(dup.nama)}`, 'coral'); return; }
+    const data = { nama: f.nama.value.trim(), nia: normNia(f.nia.value), angkatan: +f.angkatan.value, prodi: f.prodi.value.trim(), wa: f.wa.value.trim(), status: f.status.value, bidang: f.bidang.value.trim() || null, pendampingId: f.pendampingId.value || null };
+    const dup = db.profil.find((p) => p.nia === data.nia && p.id !== f.id.value);
+    if (dup) { toast(`NIA ${esc(data.nia)} sudah dipakai ${esc(dup.nama)}`, 'coral'); return; }
     if (f.id.value) { Object.assign(prof(f.id.value), data); commit('Data anggota diperbarui', 'sky', 'anggota', `Ubah data ${data.nama}`); }
     else {
-      const id = uid('u'); db.profil.push({ id, ...data, email: data.nama.split(' ')[0].toLowerCase() + '.' + data.nim.slice(-3) + '@kopma.um.ac.id', bergabung: TODAY, aktif: true });
+      const id = uid('u'); db.profil.push({ id, ...data, email: data.nama.split(' ')[0].toLowerCase() + '.' + data.nia.slice(-3) + '@kopma.um.ac.id', bergabung: TODAY, aktif: true });
       db.peran.push({ userId: id, peran: 'anggota', periode: PERIODE, aktif: true });
       db.simpanan.push({ id: uid('s'), userId: id, jenis: 'pokok', nominal: 50000, tanggal: TODAY, lunas: false }, { id: uid('s'), userId: id, jenis: 'wajib', nominal: 10000, tanggal: TODAY, lunas: false });
-      commit(`${esc(data.nama)} terdaftar sebagai anggota`, 'sky', 'anggota', `Anggota baru ${data.nama} (${data.nim})`);
+      commit(`${esc(data.nama)} terdaftar sebagai anggota`, 'sky', 'anggota', `Anggota baru ${data.nama} (${data.nia})`);
     }
   },
   akun: (f) => {
-    const nim = f.nim.value.trim(); if (db.profil.find((p) => p.nim === nim)) { toast('NIM sudah terdaftar', 'coral'); return; }
+    const nia = normNia(f.nia.value); if (db.profil.find((p) => p.nia === nia)) { toast('NIA sudah terdaftar', 'coral'); return; }
     const id = uid('u'); const peran = [...f.querySelectorAll('[name=peran]:checked')].map((i) => i.value);
-    db.profil.push({ id, nama: f.nama.value.trim(), nim, email: f.email.value.trim(), prodi: f.prodi.value.trim(), angkatan: 2000 + parseInt(nim.slice(0, 2), 10) || new Date().getFullYear(), wa: '', status: peran.some((r) => r !== 'anggota') ? 'pengurus' : 'anggota', bidang: null, pendampingId: null, bergabung: TODAY, aktif: true });
+    db.profil.push({ id, nama: f.nama.value.trim(), nia, email: f.email.value.trim(), prodi: f.prodi.value.trim(), angkatan: new Date().getFullYear(), wa: '', status: peran.some((r) => r !== 'anggota') ? 'pengurus' : 'anggota', bidang: null, pendampingId: null, bergabung: TODAY, aktif: true });
     peran.forEach((r) => db.peran.push({ userId: id, peran: r, periode: PERIODE, aktif: true }));
     db.simpanan.push({ id: uid('s'), userId: id, jenis: 'pokok', nominal: 50000, tanggal: TODAY, lunas: false });
     commit(`Akun ${esc(f.nama.value.trim())} dibuat`, 'mint', 'akun', `Akun baru ${f.nama.value.trim()} dengan peran ${peran.map((r) => ROLES[r].label).join(', ')}`);

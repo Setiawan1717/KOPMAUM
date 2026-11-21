@@ -21,7 +21,7 @@ Ini **mode demo**: data contoh disimpan di browser (localStorage). Perubahan han
 ## Modul MVP
 
 1. **Akun & peran**: satu akun bisa punya beberapa peran; tombol *Ganti periode* mencabut semua peran pengurus tanpa menghapus data.
-2. **Data anggota**: cari nama/NIM seketika, status simpanan pokok & wajib, pengurus pendamping.
+2. **Data anggota**: cari nama/NIA seketika, status simpanan pokok & wajib, pengurus pendamping.
 3. **Stok Kopma Mart**: mutasi masuk/keluar dengan alasan dan pencatat, daftar *perlu belanja*, stock opname dengan selisih.
 4. **Kopma Rental**: kalender per barang, cek ketersediaan unit otomatis, biaya dihitung dari tabel harga, booking terlambat ditandai merah, pratinjau kalender versi publik.
 5. **Poin anggota**: catat belanja dari HP (ada penghitung waktu, target di bawah 30 detik), rumus diatur bendahara, koreksi oleh PHI selalu tercatat.
@@ -36,7 +36,7 @@ Modul Stok bisa membaca data langsung dari web kasir (repo `KasirKopmaUM2026`, F
 - Buka **Stok Mart**, lalu masuk dengan akun yang dipakai di web kasir (hanya peran bidang usaha, PHI, atau super admin yang melihat form ini).
 - **Baca saja:** `js/kasir.js` hanya memakai `onSnapshot` dan `getDocs`. Tidak ada fungsi tulis Firestore, jadi data kasir tidak bisa berubah dari Kopma Hub.
 - Setelah tersambung, stok, daftar perlu belanja, riwayat penjualan dan barang masuk, serta penjualan hari ini diambil dari kasir secara langsung. Pencatatan stok dan opname di Kopma Hub dimatikan karena tugas itu dikerjakan di kasir.
-- **Poin otomatis:** transaksi kasir yang diisi NIM anggota langsung menjadi poin (`total ÷ rumus`, dibulatkan ke bawah per transaksi). Ada *Cek NIM* dan peringkat poin. Transaksi sebelum isian NIM ada tidak dihitung.
+- **Poin otomatis:** transaksi kasir yang diisi NIA anggota langsung menjadi poin (`total ÷ rumus`, dibulatkan ke bawah per transaksi). Ada *Cek NIA* dan peringkat poin. Transaksi sebelum isian NIA ada tidak dihitung.
 - **Batas minimum** tiap produk disimpan di Kopma Hub (browser), tidak ditulis ke data produk kasir.
 - Tombol **Cadangkan data kasir** mengunduh semua produk, transaksi, pengeluaran, dan modal harian sebagai file JSON.
 - Fitur ini tidak jalan di pratinjau claude.ai karena pratinjau memblokir koneksi ke Firebase. Buka dari hosting (Netlify/Vercel/GitHub Pages) atau dari file lokal.
@@ -56,7 +56,7 @@ supabase/schema.sql 9 tabel, aturan RLS, trigger cek booking, view jadwal_sewa_p
 
 1. Buat project Supabase, jalankan `supabase/schema.sql` di SQL Editor.
 2. Ganti fungsi di `js/data.js` (`Store.load/save`) dengan panggilan `supabase-js`. Nama tabel dan kolom sudah disiapkan sama dengan PRD.
-3. Web eksternal cukup membaca view `jadwal_sewa_publik` (barang, tanggal, tersedia/penuh) memakai anon key. Nama, NIM, dan WA penyewa tidak ikut.
+3. Web eksternal cukup membaca view `jadwal_sewa_publik` (barang, tanggal, tersedia/penuh) memakai anon key. Nama dan WA penyewa tidak ikut.
 4. Uji dengan satu akun untuk tiap peran sebelum rilis.
 
 ## Keputusan sementara (dari pertanyaan terbuka PRD)
