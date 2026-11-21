@@ -32,7 +32,7 @@ Akun Kopma Hub sama dengan akun web kasir. Setelah langkah awal di bawah, semuan
 
 ### Langkah awal (sekali saja, di Firebase Console)
 
-1. **Simpan kode pendaftaran.** Firestore Database → **Start collection** → ID koleksi `pengaturan` → ID dokumen `pendaftaran` → field `kode` (string) berisi kode pendaftaranmu.
+1. **Simpan kode pendaftaran.** Firestore Database → **Start collection** → ID koleksi `pengaturan` → ID dokumen `pendaftaran` → field `kode` (string) berisi kode pendaftaranmu, minimal 6 karakter (kode yang lebih pendek, termasuk kosong, selalu ditolak).
    - Kode ini **tidak pernah** ditulis di repo. Tidak ada aplikasi yang bisa membacanya; hanya aturan Firestore yang mencocokkannya saat orang mendaftar.
    - Mengganti kode cukup dengan mengubah field ini. Kode lama langsung tidak berlaku.
 2. **Pastikan pendaftaran Firebase menyala.** Authentication → Settings → User actions → **Enable create (sign-up)** harus dicentang.

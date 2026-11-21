@@ -63,6 +63,7 @@ service cloud.firestore {
     match /bukti_daftar/{uid} {
       allow create: if masuk() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['kode'])
+        && request.resource.data.kode is string && request.resource.data.kode.size() >= 6   // kode kosong/pendek selalu ditolak
         && request.resource.data.kode == get(/databases/$(database)/documents/pengaturan/pendaftaran).data.kode;
       allow read, update, delete: if false;
     }
