@@ -1023,7 +1023,7 @@ const FORM = {
   login: (f) => {
     const id = f.id.value.trim().toLowerCase(); const p = db.profil.find((x) => x.email.toLowerCase() === id || x.nim === id);
     const msg = $('#loginMsg');
-    if (!p || f.pass.value !== 'kopma123') { msg.innerHTML = `<div class="notice c-coral">${ic('alert')}<span>Email/NIM atau kata sandi salah. Cek lagi, atau pakai akun demo di bawah.</span></div>`; return; }
+    if (!p || f.pass.value !== 'kopma123') { msg.innerHTML = `<div class="notice c-coral">${ic('alert')}<span>Halaman ini masih mode demo, jadi akun kasir belum bisa dipakai di sini. Pilih salah satu akun demo di bawah, lalu sambungkan akun kasir lewat menu <b>Stok Mart</b>.</span></div>`; return; }
     if (!p.aktif) { msg.innerHTML = `<div class="notice c-coral">${ic('alert')}<span>Akun ini sudah dinonaktifkan. Hubungi super admin.</span></div>`; return; }
     ACT['demo-login']({ dataset: { id: p.id } });
   },
