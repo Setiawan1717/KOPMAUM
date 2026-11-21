@@ -382,7 +382,7 @@ function stokRow(b) {
       <div class="sub">${esc(b.kategori)} · jual ${rp(b.hargaJual)}${b.barcode ? ` · <span class="num">${esc(b.barcode)}</span>` : ''}</div>
       <div class="meter c-${low ? 'coral' : b.stok < b.min * 1.5 ? 'sun' : 'lime'}" style="margin-top:6px"><i style="width:${pct}%"></i></div>
     </div>
-    <div class="end"><b class="num" style="font-size:1.15rem">${b.stok}</b>${Kasir.on && can.stokEdit() ? `<button class="btn btn-ghost btn-sm num" data-act="set-min" data-id="${esc(b.id)}" title="Ubah batas minimum">min ${b.min}</button>` : `<span class="small muted num">min ${b.min}</span>`}${low ? '<span class="pill c-coral">Perlu belanja</span>' : ''}</div>
+    <div class="end"><b class="num" style="font-size:1.15rem">${b.stok}</b>${Kasir.on && can.stokEdit() && !b.minDariKasir ? `<button class="btn btn-ghost btn-sm num" data-act="set-min" data-id="${esc(b.id)}" title="Ubah batas minimum">min ${b.min}</button>` : `<span class="small muted num">min ${b.min}</span>`}${low ? '<span class="pill c-coral">Perlu belanja</span>' : ''}</div>
   </div>`;
 }
 function viewStok() {

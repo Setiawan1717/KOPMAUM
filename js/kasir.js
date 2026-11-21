@@ -108,7 +108,9 @@ const Kasir = {
     return this.products.map((p) => ({
       id: p.id, nama: p.nama || '(tanpa nama)', kategori: p.kategori || 'Lainnya', barcode: p.barcode || '',
       hargaBeli: Number(p.hargaModal) || 0, hargaJual: Number(p.hargaJual) || 0, stok: Number(p.stok) || 0,
-      min: Number(Store.getPref(this.minKey(p.id), '5')) || 0,
+      // batas minimum dari kasir (kolom batasMinimum) diutamakan; kalau kosong pakai pengaturan Kopma Hub, default 5
+      min: Number.isFinite(p.batasMinimum) ? p.batasMinimum : (Number(Store.getPref(this.minKey(p.id), '5')) || 0),
+      minDariKasir: Number.isFinite(p.batasMinimum),
     })).sort((a, b) => a.nama.localeCompare(b.nama));
   },
   riwayat() {

@@ -1,6 +1,6 @@
 # Aturan keamanan Firestore (project kopma-um)
 
-`firestore.rules` mengunci database web kasir supaya aman dipakai bersama Kopma Hub. Aturan ini disusun dari semua operasi yang ada di kode web kasir, dan sudah diuji di Firestore Emulator: 20 alur kasir tetap jalan dan 17 percobaan penyalahgunaan ditolak.
+`firestore.rules` mengunci database web kasir supaya aman dipakai bersama Kopma Hub. Aturan ini disusun dari semua operasi yang ada di kode web kasir, dan sudah diuji di Firestore Emulator: 20 alur kasir tetap jalan dan 17 percobaan penyalahgunaan ditolak. Web kasir versi perbaikan juga sudah diuji ujung ke ujung (login, jualan dengan NIM, stok berkurang) terhadap aturan ini.
 
 ## Masalah yang ditutup
 
@@ -14,6 +14,10 @@ Di web kasir, pendaftaran akun baru dijaga PIN yang ditulis langsung di kode. Re
 | Kopma Hub | Membaca (pakai akun kasir/admin) | Menulis |
 
 ## Cara memasang
+
+> **Urutan ini penting.** Web kasir versi lama mengambil data *sebelum* login. Dengan aturan baru, permintaan itu ditolak dan daftar produk kosong. Jadi **perbarui web kasir dulu** (cabang `perbaikan-kopmahub` di repo kasir), baru pasang aturan ini.
+
+0. **Perbarui web kasir** ke versi yang mengambil data setelah login, lalu pastikan kasir masih jalan normal dengan aturan lama.
 
 1. **Cadangkan dulu.** Buka Kopma Hub → Stok Mart → sambungkan → *Cadangkan data kasir*. Simpan file JSON-nya.
 2. **Cek akun yang ada.** Firebase Console → Firestore Database → koleksi `users`. Pastikan setiap dokumen punya `role` bernilai persis `admin` atau `kasir` (huruf kecil). Akun dengan nilai lain tidak akan bisa login setelah aturan dipasang.
