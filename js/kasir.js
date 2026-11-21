@@ -33,7 +33,7 @@ const Kasir = {
 
   _pesan(e) {
     const c = e?.code || '';
-    if (c.includes('invalid-credential') || c.includes('wrong-password') || c.includes('user-not-found') || c.includes('invalid-email')) return 'Email atau kata sandi akun kasir salah.';
+    if (c.includes('invalid-credential') || c.includes('wrong-password') || c.includes('user-not-found') || c.includes('invalid-email')) return 'Nama pengguna atau kata sandi kasir salah.';
     if (c.includes('permission-denied')) return 'Akun ini tidak punya izin membaca data kasir. Cek Rules Firestore.';
     if (c.includes('too-many-requests')) return 'Terlalu banyak percobaan masuk. Tunggu beberapa menit.';
     if (c.includes('network') || c.includes('unavailable')) return 'Tidak bisa menghubungi Firebase. Cek koneksi internet.';
@@ -60,6 +60,8 @@ const Kasir = {
 
   async connect(email, pass) {
     this._set({ status: 'connecting', error: '' });
+    // web kasir login dengan nama pengguna, disimpan di Firebase sebagai <nama>@kopma.um
+    if (!email.includes('@')) email = email.replace(/\s+/g, '').toLowerCase() + '@kopma.um';
     try {
       const fb = await this._load();
       const cred = await fb.auth.signInWithEmailAndPassword(fb.authInst, email, pass);

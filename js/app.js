@@ -443,8 +443,8 @@ function kasirPanel() {
   if (!bisaAtur) return `<div class="notice c-sun">${ic('alert')}<span>Belum tersambung ke web kasir. Yang tampil di bawah adalah data contoh.</span></div>`;
   return `<section class="card c-mint">
     <form class="form" data-form="kasir" id="kasirForm">
-      <div style="display:grid;gap:4px"><h3>Sambungkan ke web kasir</h3><p class="small muted">Masuk dengan akun yang dipakai di web kasir. Kopma Hub hanya <b>membaca</b> produk, penjualan, dan barang masuk. Data di kasir tidak bisa berubah dari sini. Selama belum tersambung, stok di bawah adalah data contoh.</p></div>
-      <div class="form-row"><div class="field"><label for="ksEmail">Email akun kasir</label><input class="input" id="ksEmail" name="email" type="email" autocomplete="username" required></div><div class="field"><label for="ksPass">Kata sandi</label><input class="input" id="ksPass" name="pass" type="password" autocomplete="current-password" required></div></div>
+      <div style="display:grid;gap:4px"><h3>Sambungkan ke web kasir</h3><p class="small muted">Masuk dengan nama pengguna dan kata sandi yang dipakai di web kasir. Kopma Hub hanya <b>membaca</b> produk, penjualan, dan barang masuk. Data di kasir tidak bisa berubah dari sini. Selama belum tersambung, stok di bawah adalah data contoh.</p></div>
+      <div class="form-row"><div class="field"><label for="ksEmail">Nama pengguna kasir</label><input class="input" id="ksEmail" name="email" autocomplete="username" autocapitalize="none" placeholder="sama seperti saat login kasir" required></div><div class="field"><label for="ksPass">Kata sandi</label><input class="input" id="ksPass" name="pass" type="password" autocomplete="current-password" required></div></div>
       ${err}
       <button class="btn btn-primary" type="submit" style="justify-self:start">Sambungkan (baca saja)</button>
     </form></section>`;

@@ -1,0 +1,63 @@
+rules_version = '2';
+
+// Aturan keamanan Firestore untuk project kopma-um (web kasir + Kopma Hub).
+// Disusun dari semua operasi baca/tulis yang ada di web kasir (KasirKopmaUM2026/index.html):
+//  - role "kasir": jualan (kurangi stok produk + buat transaksi)
+//  - role "admin": semua menu kasir (produk, barang masuk, riwayat, laporan, pengeluaran, modal harian)
+//  - Kopma Hub: hanya membaca, memakai akun kasir/admin
+// Semua yang tidak disebut di bawah otomatis DITOLAK.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function masuk() { return request.auth != null; }
+    function akun() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function terdaftar() { return masuk() && exists(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function admin() { return terdaftar() && akun().role == 'admin'; }
+    function petugas() { return terdaftar() && akun().role in ['admin', 'kasir']; }
+
+    // ---------- Akun ----------
+    // Akun baru TIDAK bisa mendaftarkan dirinya sendiri (apalagi sebagai admin).
+    // Akun dibuat pemilik lewat Firebase Console; lihat firebase/README.md.
+    match /users/{uid} {
+      allow read: if masuk() && (request.auth.uid == uid || admin());
+      allow update, delete: if admin();
+      allow create: if admin();
+    }
+
+    // ---------- Produk ----------
+    match /products/{id} {
+      allow read: if petugas();
+      allow create, delete: if admin();
+      // admin bebas mengubah; kasir hanya boleh mengubah angka stok (saat jualan)
+      allow update: if admin()
+        || (petugas()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stok'])
+            && request.resource.data.stok is number
+            && request.resource.data.stok >= 0);
+    }
+
+    // ---------- Transaksi ----------
+    match /transactions/{id} {
+      allow read: if petugas();
+      allow create: if petugas()
+        && request.resource.data.total is number
+        && request.resource.data.item is list;
+      allow update: if false;          // transaksi tidak boleh diedit
+      allow delete: if admin();        // hapus transaksi (menu Riwayat) hanya admin
+    }
+
+    // ---------- Pengeluaran (termasuk catatan stok masuk) ----------
+    match /pengeluaran/{id} {
+      allow read: if petugas();
+      allow create, delete: if admin();
+      allow update: if false;
+    }
+
+    // ---------- Modal harian ----------
+    match /modal_harian/{tanggal} {
+      allow read: if petugas();
+      allow write: if admin();
+    }
+  }
+}
