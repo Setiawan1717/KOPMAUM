@@ -36,6 +36,7 @@ Modul Stok bisa membaca data langsung dari web kasir (repo `KasirKopmaUM2026`, F
 - Buka **Stok Mart**, lalu masuk dengan akun yang dipakai di web kasir (hanya peran bidang usaha, PHI, atau super admin yang melihat form ini).
 - **Baca saja:** `js/kasir.js` hanya memakai `onSnapshot` dan `getDocs`. Tidak ada fungsi tulis Firestore, jadi data kasir tidak bisa berubah dari Kopma Hub.
 - Setelah tersambung, stok, daftar perlu belanja, riwayat penjualan dan barang masuk, serta penjualan hari ini diambil dari kasir secara langsung. Pencatatan stok dan opname di Kopma Hub dimatikan karena tugas itu dikerjakan di kasir.
+- **Poin otomatis:** transaksi kasir yang diisi NIM anggota langsung menjadi poin (`total ÷ rumus`, dibulatkan ke bawah per transaksi). Ada *Cek NIM* dan peringkat poin. Transaksi sebelum isian NIM ada tidak dihitung.
 - **Batas minimum** tiap produk disimpan di Kopma Hub (browser), tidak ditulis ke data produk kasir.
 - Tombol **Cadangkan data kasir** mengunduh semua produk, transaksi, pengeluaran, dan modal harian sebagai file JSON.
 - Fitur ini tidak jalan di pratinjau claude.ai karena pratinjau memblokir koneksi ke Firebase. Buka dari hosting (Netlify/Vercel/GitHub Pages) atau dari file lokal.

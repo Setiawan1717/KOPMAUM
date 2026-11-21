@@ -19,7 +19,7 @@ const Kasir = {
   status: 'off',        // off | connecting | on | error
   error: '',
   email: '',
-  products: [], transactions: [], pengeluaran: [],
+  products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '',
   onChange: () => {},
   _fb: null, _unsubs: [],
 
@@ -47,7 +47,7 @@ const Kasir = {
     const { fs, db } = this._fb;
     this._stop();
     let siap = 0;
-    const done = () => { siap++; if (siap >= 3) this._set({ on: true, status: 'on' }); else this.onChange(); };
+    const done = () => { siap++; if (siap >= 4) this._set({ on: true, status: 'on' }); else this.onChange(); };
     const fail = (e) => { this._stop(); this._set({ on: false, status: 'error', error: this._pesan(e) }); };
     const once = (fn) => { let first = true; return (snap) => { fn(snap); if (first) { first = false; done(); } else this.onChange(); }; };
     this._unsubs.push(
@@ -55,6 +55,11 @@ const Kasir = {
       fs.onSnapshot(fs.query(fs.collection(db, 'transactions'), fs.orderBy('tanggal', 'desc'), fs.limit(300)), once((s) => { this.transactions = s.docs.map((d) => ({ id: d.id, ...d.data() })); }), fail),
       fs.onSnapshot(fs.query(fs.collection(db, 'pengeluaran'), fs.orderBy('tanggal', 'desc'), fs.limit(300)), once((s) => { this.pengeluaran = s.docs.map((d) => ({ id: d.id, ...d.data() })); }), fail),
     );
+    // semua transaksi yang diisi NIM anggota (untuk poin) — tidak dibatasi 300 terakhir
+    let poinPertama = true;
+    this._unsubs.push(fs.onSnapshot(fs.query(fs.collection(db, 'transactions'), fs.where('nimAnggota', '!=', null)),
+      (s) => { this.trxAnggota = s.docs.map((d) => ({ id: d.id, ...d.data() })); this.poinError = ''; if (poinPertama) { poinPertama = false; done(); } else this.onChange(); },
+      (e) => { this.poinError = this._pesan(e); if (poinPertama) { poinPertama = false; done(); } else this.onChange(); }));
   },
   _stop() { this._unsubs.forEach((u) => { try { u(); } catch (e) { /* abaikan */ } }); this._unsubs = []; },
 
@@ -88,7 +93,7 @@ const Kasir = {
     this._stop();
     Store.setPref('kasir', '');
     try { if (this._fb) await this._fb.auth.signOut(this._fb.authInst); } catch (e) { /* abaikan */ }
-    this._set({ on: false, status: 'off', products: [], transactions: [], pengeluaran: [], email: '' });
+    this._set({ on: false, status: 'off', products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '', email: '' });
   },
 
   // cadangan lengkap (baca saja) — seluruh isi koleksi kasir sebagai JSON
@@ -121,6 +126,22 @@ const Kasir = {
       if (m) rows.push({ id: p.id, nama: m[1], jenis: 'masuk', jumlah: Number(m[2]), alasan: `Belanja stok · ${p.metode || ''}`.trim(), oleh: p.kasir || 'kasir', waktu: p.tanggal });
     });
     return rows.filter((r) => r.waktu).sort((a, b) => String(b.waktu).localeCompare(String(a.waktu)));
+  },
+  // poin per NIM dari transaksi kasir: floor(total / rpPerPoin) per transaksi
+  poinPer(rpPerPoin) {
+    const map = new Map();
+    this.trxAnggota.forEach((t) => {
+      const nim = String(t.nimAnggota || '').trim(); if (!nim) return;
+      const total = Number(t.total) || 0;
+      const poin = Math.floor(total / Math.max(1, rpPerPoin));
+      const d = map.get(nim) || { nim, poin: 0, belanja: 0, n: 0, terakhir: '', riwayat: [] };
+      d.poin += poin; d.belanja += total; d.n++;
+      if (String(t.tanggal) > d.terakhir) d.terakhir = String(t.tanggal);
+      d.riwayat.push({ id: t.id, waktu: t.tanggal, total, poin, kasir: t.kasir || 'kasir', item: (t.item || []).length });
+      map.set(nim, d);
+    });
+    map.forEach((d) => d.riwayat.sort((a, b) => String(b.waktu).localeCompare(String(a.waktu))));
+    return map;
   },
   penjualanHari(ymdStr) {
     const list = this.transactions.filter((t) => t.tanggal && ymd(new Date(t.tanggal)) === ymdStr);

@@ -118,7 +118,7 @@ const NEXT = { Menunggu: ['Dikonfirmasi', 'Batal'], Dikonfirmasi: ['Diambil', 'B
 const NEXT_LABEL = { Dikonfirmasi: 'Konfirmasi', Diambil: 'Tandai diambil', Selesai: 'Tandai kembali', Batal: 'Batalkan' };
 
 /* ================= Logika lain ================= */
-const saldoPoin = (id) => db.poin.filter((p) => p.userId === id).reduce((a, p) => a + p.poin, 0);
+const saldoPoin = (id) => (Kasir.on ? (Kasir.poinPer(db.pengaturan.rpPerPoin).get(prof(id).nim)?.poin || 0) : db.poin.filter((p) => p.userId === id).reduce((a, p) => a + p.poin, 0));
 const martItems = () => (Kasir.on ? Kasir.barang() : db.barangMart);
 const perluBelanja = () => martItems().filter((b) => b.stok < b.min);
 const stokBisaDiubah = () => can.stokEdit() && !Kasir.on;
@@ -295,7 +295,7 @@ function viewDasbor() {
     </section>` : ''}
     <section class="card c-grape">
       <div class="card-head"><h2>Poin terakhirmu</h2><a href="#poin" class="btn btn-soft btn-sm">Riwayat</a></div>
-      <div class="list">${poinRows(db.poin.filter((x) => x.userId === meId).slice(-4).reverse(), false) || empty('star', 'Belum ada belanja tercatat. Sebutkan NIM saat belanja di Kopma Mart.')}</div>
+      <div class="list">${Kasir.on ? (riwayatPoinKasir(Kasir.poinPer(db.pengaturan.rpPerPoin).get(me().nim), 4) || empty('star', 'Belum ada belanja dengan NIM-mu. Sebutkan NIM saat bayar di kasir.')) : (poinRows(db.poin.filter((x) => x.userId === meId).slice(-4).reverse(), false) || empty('star', 'Belum ada belanja tercatat. Sebutkan NIM saat belanja di Kopma Mart.'))}</div>
     </section>
     ${dampingan.length ? `
     <section class="card c-sky">
@@ -559,7 +559,57 @@ function poinRows(rows, showName = true) {
     return `<div class="row"><span class="stripe c-${kor ? 'sun' : pos ? 'grape' : 'coral'}"></span><div class="grow"><div class="title">${showName ? esc(prof(x.userId).nama) : esc(x.alasan)}</div><div class="sub">${showName ? esc(x.alasan) + ' · ' : ''}${x.belanja ? 'Belanja ' + rp(x.belanja) + ' · ' : ''}dicatat ${esc(prof(x.olehId).nama.split(' ')[0])} · ${waktu(x.waktu)}</div></div><div class="end"><b class="num" style="font-size:1.1rem;color:var(--${pos ? 'grape' : 'coral'}-ink)">${pos ? '+' : ''}${x.poin}</b></div></div>`;
   }).join('');
 }
+/* ---- Poin otomatis dari transaksi kasir ---- */
+function riwayatPoinKasir(d, max = 50) {
+  if (!d || !d.riwayat.length) return '';
+  return d.riwayat.slice(0, max).map((r) => `<div class="row"><span class="stripe c-grape"></span><div class="grow"><div class="title">Belanja ${rp(r.total)}</div><div class="sub">${r.item} barang · kasir ${esc(r.kasir)} · ${waktu(r.waktu)}</div></div><div class="end"><b class="num" style="font-size:1.1rem;color:var(--grape-ink)">+${fmtNum(r.poin)}</b></div></div>`).join('');
+}
+function kartuPoinNim(nim, d) {
+  const p = db.profil.find((x) => x.nim === nim);
+  return `<section class="card c-grape" style="background:linear-gradient(135deg,var(--grape-soft),var(--pink-soft))">
+    <span class="eyebrow">${p ? esc(p.nama) + ' · ' : ''}NIM <span class="num">${esc(nim)}</span></span>
+    <div class="bignum num" style="color:var(--grape-ink)">${fmtNum(d?.poin || 0)}</div>
+    <p class="muted small" style="margin-top:8px">${d ? `Dari ${d.n} kali belanja senilai ${rp(d.belanja)}. Terakhir ${waktu(d.terakhir)}.` : 'Belum ada belanja dengan NIM ini di kasir.'}</p>
+  </section>
+  ${d ? `<section class="card"><div class="card-head"><h3>Riwayat poin</h3></div><div class="list">${riwayatPoinKasir(d)}</div></section>` : ''}`;
+}
+function viewPoinKasir() {
+  const rate = db.pengaturan.rpPerPoin;
+  const data = Kasir.poinPer(rate);
+  const tabs = [['saya', 'Poin saya'], ['cek', 'Cek NIM'], ...(can.poinAll() ? [['semua', 'Semua anggota']] : [])];
+  if (!tabs.find((t) => t[0] === ui.poinTab)) ui.poinTab = 'saya';
+  let body = '';
+  if (ui.poinTab === 'saya') {
+    body = `<div class="grid grid-2">${kartuPoinNim(me().nim, data.get(me().nim))}</div>`;
+  } else if (ui.poinTab === 'cek') {
+    body = `<section class="card c-grape" style="max-width:620px"><div class="field"><label for="cekNim">NIM anggota</label>
+      <div class="search">${ic('search')}<input class="input input-lg num" id="cekNim" data-live="ceknim" inputmode="numeric" placeholder="Ketik NIM…" value="${esc(ui.q.ceknim || '')}"></div>
+      <span class="hint">Cocok untuk menjawab anggota yang bertanya "poinku berapa?"</span></div></section>
+      <div class="grid grid-2" id="cekHasil">${hasilCekNim()}</div>`;
+  } else {
+    const rank = [...data.values()].sort((a, b) => b.poin - a.poin);
+    const max = Math.max(1, rank[0]?.poin || 1);
+    const colors = ['grape', 'pink', 'sky', 'tangerine', 'lime', 'mint', 'sun', 'coral'];
+    body = `
+    ${can.poinRumus() ? `<section class="card c-sun"><form class="toolbar" data-form="rumus"><div class="field" style="flex:1 1 220px"><label for="rateInput">Rumus poin (bendahara)</label><div class="toolbar"><span>1 poin setiap</span><input class="input num" id="rateInput" name="rate" type="number" min="100" step="100" value="${rate}" style="max-width:140px"><span>rupiah</span></div><span class="hint">Berlaku untuk semua transaksi, termasuk yang lama, karena poin dihitung ulang dari data kasir.</span></div><button class="btn btn-primary" type="submit">Simpan rumus</button></form></section>` : ''}
+    <section class="card c-grape"><div class="card-head"><h2>Peringkat poin</h2><span class="pill">${rank.length} NIM</span></div>
+      <div class="list">${rank.length ? rank.map((d, i) => { const p = db.profil.find((x) => x.nim === d.nim); return `<div class="row click" data-act="lihat-nim" data-nim="${esc(d.nim)}" role="button" tabindex="0"><span class="avatar c-${colors[i % colors.length]}" style="width:34px;height:34px">${i + 1}</span><div class="grow"><div class="title">${p ? esc(p.nama) : `<span class="num">${esc(d.nim)}</span>`}</div><div class="sub">${p ? `<span class="num">${esc(d.nim)}</span> · ` : 'Belum terdaftar di Kopma Hub · '}${d.n}× belanja · ${rp(d.belanja)}</div><div class="meter c-${colors[i % colors.length]}" style="margin-top:6px"><i style="width:${Math.round((d.poin / max) * 100)}%"></i></div></div><div class="end"><b class="num">${fmtNum(d.poin)}</b></div></div>`; }).join('') : empty('star', 'Belum ada transaksi kasir yang diisi NIM anggota.', 'grape')}</div>
+    </section>`;
+  }
+  return `${pageHead('Poin anggota', 'Poin tercatat otomatis setiap kasir mengisi NIM anggota saat pembayaran.', exportBtn('poin'))}
+  <div class="notice c-mint">${ic('check')}<span>Tersambung ke kasir. ${rp(rate)} belanja = 1 poin, dihitung per transaksi. Transaksi sebelum ada isian NIM tidak dihitung.</span></div>
+  ${Kasir.poinError ? `<div class="notice c-coral">${ic('alert')}<span>Data poin gagal dimuat: ${esc(Kasir.poinError)}</span></div>` : ''}
+  <div class="seg">${tabs.map(([k, l]) => `<button class="${ui.poinTab === k ? 'on' : ''}" data-act="poin-tab" data-k="${k}">${l}</button>`).join('')}</div>
+  ${body}`;
+}
+function hasilCekNim() {
+  const nim = String(ui.q.ceknim || '').replace(/\D/g, '');
+  if (nim.length < 8) return empty('search', 'Ketik NIM lengkap untuk melihat poinnya.');
+  return kartuPoinNim(nim, Kasir.poinPer(db.pengaturan.rpPerPoin).get(nim));
+}
+
 function viewPoin() {
+  if (Kasir.on) return viewPoinKasir();
   const rate = db.pengaturan.rpPerPoin;
   const tabs = [['saya', 'Poin saya'], ...(can.poinAdd() ? [['catat', 'Catat belanja']] : []), ...(can.poinAll() ? [['semua', 'Semua anggota']] : [])];
   if (!tabs.find((t) => t[0] === ui.poinTab)) ui.poinTab = 'saya';
@@ -896,6 +946,7 @@ const ACT = {
   'poin-tab': (el) => { ui.poinTab = el.dataset.k; ui.poinTimer = null; render(); },
   'nominal-cepat': (el) => { const i = $('#nominalInput'); i.value = el.dataset.n; startTimer(); previewPoin(); },
   'pilih-anggota': (el) => { const p = prof(el.dataset.id); $('#poinUser').value = p.id; $('#nimInput').value = `${p.nim} · ${p.nama}`; $('#nimSuggest').innerHTML = `<div class="notice c-grape">${avatar(p, 30)}<span>${esc(p.nama)}<br><span class="small">Saldo sekarang ${fmtNum(saldoPoin(p.id))} poin</span></span></div>`; $('#nominalInput').focus(); previewPoin(); },
+  'lihat-nim': (el) => { ui.q.ceknim = el.dataset.nim; ui.poinTab = 'cek'; render(); window.scrollTo(0, 0); },
   'poin-koreksi': (el) => {
     const p = prof(el.dataset.id);
     openModal(`Koreksi poin`, `<form class="form" data-form="koreksi" id="koreksiForm"><input type="hidden" name="userId" value="${p.id}">
@@ -962,7 +1013,7 @@ const ACT = {
       anggota: [['Nama', 'NIM', 'Prodi', 'Angkatan', 'WA', 'Status', 'Bidang', 'Pendamping', 'Simpanan lunas'], db.profil.map((p) => [p.nama, p.nim, p.prodi, p.angkatan, p.wa, p.status, p.bidang || '', p.pendampingId ? prof(p.pendampingId).nama : '', simpananLunas(p.id) ? 'Ya' : 'Belum'])],
       stok: [['Barang', 'Kategori', 'Harga beli', 'Harga jual', 'Stok', 'Minimum'], martItems().map((b) => [b.nama, b.kategori, b.hargaBeli, b.hargaJual, b.stok, b.min])],
       booking: [['Penyewa', 'WA', 'Barang', 'Unit', 'Ambil', 'Kembali', 'Total', 'Status'], db.booking.map((b) => [b.penyewa, b.wa, db.barangSewa.find((x) => x.id === b.barangId).nama, b.unit, b.ambil, b.kembali, b.total, b.status])],
-      poin: [['Anggota', 'NIM', 'Belanja', 'Poin', 'Alasan', 'Pencatat', 'Waktu'], db.poin.map((x) => [prof(x.userId).nama, prof(x.userId).nim, x.belanja, x.poin, x.alasan, prof(x.olehId).nama, x.waktu])],
+      poin: Kasir.on ? [['NIM', 'Nama', 'Jumlah belanja', 'Total belanja', 'Poin', 'Terakhir belanja'], [...Kasir.poinPer(db.pengaturan.rpPerPoin).values()].map((d) => [d.nim, db.profil.find((x) => x.nim === d.nim)?.nama || '', d.n, d.belanja, d.poin, d.terakhir])] : [['Anggota', 'NIM', 'Belanja', 'Poin', 'Alasan', 'Pencatat', 'Waktu'], db.poin.map((x) => [prof(x.userId).nama, prof(x.userId).nim, x.belanja, x.poin, x.alasan, prof(x.olehId).nama, x.waktu])],
       fee: [['Penerima', 'Jenis', 'Kegiatan', 'Nominal', 'Tanggal', 'Dibayar'], db.fee.map((f) => [prof(f.userId).nama, f.jenis, f.kegiatan, f.nominal, f.tanggal, f.lunas ? 'Ya' : 'Belum'])],
     }[k];
     const csv = [T[0], ...T[1]].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -1003,6 +1054,7 @@ const LIVE = {
     previewPoin();
   },
   nominal: () => { startTimer(); previewPoin(); },
+  ceknim: (el) => { ui.q.ceknim = el.value; $('#cekHasil').innerHTML = hasilCekNim(); },
   opname: () => {
     let n = 0, beda = 0;
     document.querySelectorAll('[data-live="opname"]').forEach((i) => {
@@ -1138,7 +1190,7 @@ window.addEventListener('hashchange', () => { closeModal(); render(); window.scr
   const t = Store.getPref('theme', ''); if (t) document.documentElement.dataset.theme = t;
   if (meId === '') meId = null;
   Kasir.onChange = () => {
-    if (!me() || !['stok', 'dasbor'].includes(ui.view) || $('#modalBack')) return;
+    if (!me() || !['stok', 'dasbor', 'poin'].includes(ui.view) || $('#modalBack')) return;
     const a = document.activeElement;
     if (a && a.matches('input, select, textarea') && $('#main')?.contains(a)) { if ($('#listStok')) $('#listStok').innerHTML = listStok(); return; }
     render();
