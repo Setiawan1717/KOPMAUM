@@ -1,6 +1,7 @@
-/* Kopma Hub — sambungan ke data web kasir (Firebase project kopma-um).
-   BACA SAJA: file ini hanya memakai fungsi baca Firestore (onSnapshot, getDocs).
-   Tidak ada addDoc/setDoc/updateDoc/deleteDoc/writeBatch, jadi data kasir tidak bisa berubah dari sini. */
+/* Kopma Hub — sambungan ke Firebase project kopma-um (dipakai bersama web kasir).
+   - Data kasir (products, transactions, pengeluaran, modal_harian): BACA SAJA.
+   - Satu-satunya yang ditulis: koleksi "anggota" (fungsi simpanAnggota), hanya oleh ketua/sekretaris.
+   Aturan Firestore (firebase/firestore.rules) menolak tulisan lain apa pun yang dikirim dari sini. */
 
 const KASIR_FIREBASE_CONFIG = {
     apiKey: "AIzaSyBINmUacCCgyXsQOn898lKWPTkygCO92xA",
@@ -20,6 +21,10 @@ const Kasir = {
   error: '',
   email: '',
   products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '',
+  akun: null,           // dokumen users milik akun yang login: { uid, username, role, hub[], nama, nia }
+  anggota: [], anggotaError: '',
+  get aksesKasir() { return ['admin', 'kasir'].includes(this.akun?.role); },
+  get bacaAnggota() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'sekretaris', 'bendahara'].includes(r)); },
   onChange: () => {},
   _fb: null, _unsubs: [],
 
@@ -33,8 +38,10 @@ const Kasir = {
 
   _pesan(e) {
     const c = e?.code || '';
-    if (c.includes('invalid-credential') || c.includes('wrong-password') || c.includes('user-not-found') || c.includes('invalid-email')) return 'Nama pengguna atau kata sandi kasir salah.';
-    if (c.includes('permission-denied')) return 'Akun ini tidak punya izin membaca data kasir. Cek Rules Firestore.';
+    if (c.includes('invalid-credential') || c.includes('wrong-password') || c.includes('user-not-found') || c.includes('invalid-email')) return 'Nama pengguna atau kata sandi salah.';
+    if (c.includes('permission-denied')) return 'Akun ini tidak punya izin untuk data tersebut. Cek peran akun di Firebase.';
+    if (c === 'akun-belum-terdaftar') return 'Akun ini belum terdaftar di koleksi users Firebase. Minta admin mendaftarkannya.';
+    if (c === 'nia-sudah-ada') return e.message;
     if (c.includes('too-many-requests')) return 'Terlalu banyak percobaan masuk. Tunggu beberapa menit.';
     if (c.includes('network') || c.includes('unavailable')) return 'Tidak bisa menghubungi Firebase. Cek koneksi internet.';
     if (!c && e?.message?.includes('import')) return 'Library Firebase gagal dimuat. Buka Kopma Hub lewat internet (bukan pratinjau).';
@@ -46,20 +53,35 @@ const Kasir = {
   _listen() {
     const { fs, db } = this._fb;
     this._stop();
+    const perlu = (this.aksesKasir ? 4 : 0) + (this.bacaAnggota ? 1 : 0);
     let siap = 0;
-    const done = () => { siap++; if (siap >= 4) this._set({ on: true, status: 'on' }); else this.onChange(); };
+    const done = () => { siap++; if (siap >= perlu) this._set({ on: true, status: 'on' }); else this.onChange(); };
+    if (!perlu) { this._set({ on: true, status: 'on' }); return; }
     const fail = (e) => { this._stop(); this._set({ on: false, status: 'error', error: this._pesan(e) }); };
     const once = (fn) => { let first = true; return (snap) => { fn(snap); if (first) { first = false; done(); } else this.onChange(); }; };
-    this._unsubs.push(
-      fs.onSnapshot(fs.collection(db, 'products'), once((s) => { this.products = s.docs.map((d) => ({ id: d.id, ...d.data() })); }), fail),
-      fs.onSnapshot(fs.query(fs.collection(db, 'transactions'), fs.orderBy('tanggal', 'desc'), fs.limit(300)), once((s) => { this.transactions = s.docs.map((d) => ({ id: d.id, ...d.data() })); }), fail),
-      fs.onSnapshot(fs.query(fs.collection(db, 'pengeluaran'), fs.orderBy('tanggal', 'desc'), fs.limit(300)), once((s) => { this.pengeluaran = s.docs.map((d) => ({ id: d.id, ...d.data() })); }), fail),
-    );
-    // semua transaksi yang diisi NIA anggota (untuk poin) — tidak dibatasi 300 terakhir
-    let poinPertama = true;
-    this._unsubs.push(fs.onSnapshot(fs.query(fs.collection(db, 'transactions'), fs.where('niaAnggota', '!=', null)),
-      (s) => { this.trxAnggota = s.docs.map((d) => ({ id: d.id, ...d.data() })); this.poinError = ''; if (poinPertama) { poinPertama = false; done(); } else this.onChange(); },
-      (e) => { this.poinError = this._pesan(e); if (poinPertama) { poinPertama = false; done(); } else this.onChange(); }));
+    // pendengar yang gagal sendiri tidak memutus sambungan (cukup tampilkan pesan)
+    const lunak = (fn, errKey) => { let first = true; return [(snap) => { fn(snap); this[errKey] = ''; if (first) { first = false; done(); } else this.onChange(); }, (e) => { this[errKey] = this._pesan(e); if (first) { first = false; done(); } else this.onChange(); }]; };
+    if (this.aksesKasir) {
+      this._unsubs.push(
+        fs.onSnapshot(fs.collection(db, 'products'), once((s) => { this.products = s.docs.map((d) => ({ id: d.id, ...d.data() })); }), fail),
+        fs.onSnapshot(fs.query(fs.collection(db, 'transactions'), fs.orderBy('tanggal', 'desc'), fs.limit(300)), once((s) => { this.transactions = s.docs.map((d) => ({ id: d.id, ...d.data() })); }), fail),
+        fs.onSnapshot(fs.query(fs.collection(db, 'pengeluaran'), fs.orderBy('tanggal', 'desc'), fs.limit(300)), once((s) => { this.pengeluaran = s.docs.map((d) => ({ id: d.id, ...d.data() })); }), fail),
+        // semua transaksi yang diisi NIA anggota (untuk poin) — tidak dibatasi 300 terakhir
+        fs.onSnapshot(fs.query(fs.collection(db, 'transactions'), fs.where('niaAnggota', '!=', null)), ...lunak((s) => { this.trxAnggota = s.docs.map((d) => ({ id: d.id, ...d.data() })); }, 'poinError')),
+      );
+    }
+    if (this.bacaAnggota) {
+      this._unsubs.push(fs.onSnapshot(fs.collection(db, 'anggota'), ...lunak((s) => {
+        this.anggota = s.docs.map((d) => ({ ...d.data(), nia: d.id })).sort((a, b) => String(a.nama).localeCompare(String(b.nama)));
+      }, 'anggotaError')));
+    }
+  },
+  async _muatAkun(user) {
+    const { fs, db } = this._fb;
+    const snap = await fs.getDoc(fs.doc(db, 'users', user.uid));
+    if (!snap.exists()) { const e = new Error('akun'); e.code = 'akun-belum-terdaftar'; throw e; }
+    const d = snap.data();
+    this.akun = { uid: user.uid, username: d.username || user.email.split('@')[0], role: d.role || '', hub: Array.isArray(d.hub) ? d.hub : [], nama: d.nama || '', nia: d.nia ? String(d.nia).replace(/\s+/g, '').toUpperCase() : '' };
   },
   _stop() { this._unsubs.forEach((u) => { try { u(); } catch (e) { /* abaikan */ } }); this._unsubs = []; },
 
@@ -71,9 +93,13 @@ const Kasir = {
       const fb = await this._load();
       const cred = await fb.auth.signInWithEmailAndPassword(fb.authInst, email, pass);
       this.email = cred.user.email;
+      await this._muatAkun(cred.user);
       Store.setPref('kasir', 'on');
       this._listen();
-    } catch (e) { this._set({ status: 'error', error: this._pesan(e) }); }
+    } catch (e) {
+      if (e?.code === 'akun-belum-terdaftar') { try { await this._fb.auth.signOut(this._fb.authInst); } catch (x) { /* abaikan */ } }
+      this._set({ status: 'error', error: this._pesan(e) });
+    }
   },
 
   // sambung ulang otomatis kalau sebelumnya sudah login di browser ini
@@ -85,6 +111,7 @@ const Kasir = {
       const user = await new Promise((res) => { const u = fb.auth.onAuthStateChanged(fb.authInst, (x) => { u(); res(x); }); });
       if (!user) { Store.setPref('kasir', ''); this._set({ status: 'off' }); return; }
       this.email = user.email;
+      await this._muatAkun(user);
       this._listen();
     } catch (e) { this._set({ status: 'error', error: this._pesan(e) }); }
   },
@@ -93,7 +120,24 @@ const Kasir = {
     this._stop();
     Store.setPref('kasir', '');
     try { if (this._fb) await this._fb.auth.signOut(this._fb.authInst); } catch (e) { /* abaikan */ }
-    this._set({ on: false, status: 'off', products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '', email: '' });
+    this._set({ on: false, status: 'off', products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '', email: '', akun: null, anggota: [], anggotaError: '' });
+  },
+
+  // tambah / ubah data anggota (dokumen anggota/{NIA}); hanya berhasil untuk ketua & sekretaris
+  async simpanAnggota(data, baru) {
+    const { fs, db } = await this._load();
+    const ref = fs.doc(db, 'anggota', data.nia);
+    const oleh = this.akun?.username || 'kopmahub';
+    if (baru) {
+      await fs.runTransaction(db, async (tx) => {
+        const ada = await tx.get(ref);
+        if (ada.exists()) { const e = new Error(`NIA ${data.nia} sudah terdaftar atas nama ${ada.data().nama}.`); e.code = 'nia-sudah-ada'; throw e; }
+        tx.set(ref, { ...data, aktif: true, dibuat: new Date().toISOString(), dibuatOleh: oleh });
+      });
+    } else {
+      const { nia, ...ubah } = data;
+      await fs.updateDoc(ref, { ...ubah, diubah: new Date().toISOString(), diubahOleh: oleh });
+    }
   },
 
   // cadangan lengkap (baca saja) — seluruh isi koleksi kasir sebagai JSON

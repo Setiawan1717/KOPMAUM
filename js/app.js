@@ -62,9 +62,23 @@ const ui = {
 };
 const save = () => Store.save(db);
 
-const me = () => db.profil.find((p) => p.id === meId);
-const prof = (id) => db.profil.find((p) => p.id === id) || { id: 'x', nama: 'Tidak dikenal', nia: '-' };
-const rolesOf = (id) => db.peran.filter((r) => r.userId === id && r.aktif).map((r) => r.peran);
+/* Mode akun sungguhan: login lewat Firebase (akun yang sama dengan web kasir).
+   Peran Kopma Hub diambil dari field "hub" di dokumen users; role kasir "admin"/"kasir" ikut dipetakan. */
+const LIVE_ID = 'live';
+const isLive = () => meId === LIVE_ID;
+const liveProfil = () => { const a = Kasir.akun || {}; const dariAnggota = a.nia ? Kasir.anggota.find((x) => x.nia === a.nia) : null;
+  return { id: LIVE_ID, nama: a.nama || dariAnggota?.nama || a.username || 'Pengguna', nia: a.nia || '', email: (a.username || '') + ' · akun Kopma', prodi: dariAnggota?.prodi || '', angkatan: dariAnggota?.angkatan || '', wa: '', status: 'pengurus', bidang: null, pendampingId: null, bergabung: TODAY, aktif: true }; };
+const me = () => (isLive() ? (Kasir.on && Kasir.akun ? liveProfil() : null) : db.profil.find((p) => p.id === meId));
+const prof = (id) => (id === LIVE_ID ? me() : db.profil.find((p) => p.id === id)) || { id: 'x', nama: 'Tidak dikenal', nia: '-' };
+const rolesOf = (id) => {
+  if (id === LIVE_ID) {
+    const a = Kasir.akun || {}; const r = (a.hub || []).filter((x) => ROLES[x]);
+    if (a.role === 'admin') r.push('bidang_usaha'); if (a.role === 'kasir') r.push('petugas_jaga');
+    return [...new Set(r.length ? r : ['anggota'])];
+  }
+  return db.peran.filter((r) => r.userId === id && r.aktif).map((r) => r.peran);
+};
+const anggotaByNia = (nia) => (isLive() ? Kasir.anggota.find((a) => a.nia === nia) : db.profil.find((x) => x.nia === nia));
 const has = (...rs) => { const mine = rolesOf(meId); return rs.some((r) => mine.includes(r)); };
 const isPHI = () => has(...PHI_ROLES);
 
@@ -89,6 +103,14 @@ const can = {
   export: () => isPHI(),
   jejak: () => has('super_admin') || isPHI(),
 };
+
+// Di mode akun sungguhan, modul yang datanya belum di Firebase disembunyikan supaya tidak tercampur data contoh.
+['akunView', 'akunEdit', 'anggotaView', 'anggotaFull', 'anggotaEdit', 'rentalView', 'rentalEdit', 'inventarisEdit', 'poinAdd', 'poinKoreksi', 'feeEdit', 'feeAll', 'jejak']
+  .forEach((k) => { const f = can[k]; can[k] = () => !isLive() && f(); });
+can.anggotaLiveView = () => isLive() && (has('ketua', 'sekretaris', 'bendahara') || Kasir.akun?.role === 'admin');
+can.anggotaLiveEdit = () => isLive() && has('ketua', 'sekretaris');
+const stokTersedia = () => can.stokView() && (!isLive() || Kasir.aksesKasir);
+const poinTersedia = () => !isLive() || Kasir.aksesKasir;
 
 function catat(modul, aksi) { db.log.unshift({ id: uid('l'), olehId: meId, modul, aksi, waktu: nowIso() }); }
 
@@ -130,11 +152,11 @@ const feeOf = (id) => db.fee.filter((f) => f.userId === id).sort((a, b) => b.tan
 /* ================= Navigasi ================= */
 const NAV = [
   { id: 'dasbor', label: 'Dasbor', icon: 'home', color: 'sun', show: () => true },
-  { id: 'anggota', label: 'Anggota', icon: 'users', color: 'sky', show: () => true, labelFn: () => (can.anggotaView() ? 'Anggota' : 'Profil saya') },
-  { id: 'stok', label: 'Stok Mart', icon: 'box', color: 'lime', show: () => can.stokView() },
+  { id: 'anggota', label: 'Anggota', icon: 'users', color: 'sky', show: () => (isLive() ? can.anggotaLiveView() : true), labelFn: () => (can.anggotaView() || isLive() ? 'Anggota' : 'Profil saya') },
+  { id: 'stok', label: 'Stok Mart', icon: 'box', color: 'lime', show: () => stokTersedia() },
   { id: 'rental', label: 'Rental', icon: 'cal', color: 'tangerine', show: () => can.rentalView() },
-  { id: 'poin', label: 'Poin', icon: 'star', color: 'grape', show: () => true },
-  { id: 'fee', label: 'Fee & gaji', icon: 'wallet', color: 'pink', show: () => true },
+  { id: 'poin', label: 'Poin', icon: 'star', color: 'grape', show: () => poinTersedia() },
+  { id: 'fee', label: 'Fee & gaji', icon: 'wallet', color: 'pink', show: () => !isLive() },
   { id: 'akun', label: 'Akun & peran', icon: 'shield', color: 'mint', show: () => can.akunView() },
   { id: 'jejak', label: 'Jejak', icon: 'history', color: 'coral', show: () => can.jejak() },
 ];
@@ -149,6 +171,10 @@ function route() {
 /* ================= Render ================= */
 const app = () => $('#app');
 function render() {
+  if (isLive() && !Kasir.on) {
+    if (Kasir.status === 'connecting') { app().innerHTML = `<div class="login-form c-sky" style="min-height:100vh"><div class="inner" style="text-align:center;justify-items:center"><img src="logo-kopma.png" alt="" style="width:64px;height:64px;border-radius:50%;background:#fff;padding:4px"><h2>Memuat Kopma Hub…</h2><p class="muted">Mengambil data dari Firebase.</p></div></div>`; return; }
+    ui.loginError = Kasir.status === 'error' ? Kasir.error : ''; meId = null; Store.setPref('me', '');
+  }
   if (!me() || !me().aktif) { app().innerHTML = viewLogin(); return; }
   route();
   const nav = NAV.filter((n) => n.show());
@@ -215,17 +241,17 @@ function viewLogin() {
     </section>
     <section class="login-form c-sky">
       <div class="inner">
-        <div style="display:grid;gap:6px"><h2 style="font-size:1.6rem">Masuk</h2><p class="muted">Pakai email atau NIA dan kata sandi akunmu.</p></div>
+        <div style="display:grid;gap:6px"><h2 style="font-size:1.6rem">Masuk</h2><p class="muted">Pakai nama pengguna dan kata sandi akun Kopma (sama dengan akun web kasir).</p></div>
         <form class="form" data-form="login" id="loginForm">
-          <div class="field"><label for="loginId">Email atau NIA</label><input class="input" id="loginId" name="id" autocomplete="username" placeholder="contoh: 2023.006" required></div>
+          <div class="field"><label for="loginId">Nama pengguna</label><input class="input" id="loginId" name="id" autocomplete="username" autocapitalize="none" placeholder="contoh: adit" required></div>
           <div class="field"><label for="loginPass">Kata sandi</label><input class="input" id="loginPass" name="pass" type="password" autocomplete="current-password" placeholder="••••••••" required></div>
-          <div id="loginMsg"></div>
-          <button class="btn btn-primary" type="submit">Masuk</button>
-          <button class="btn btn-ghost btn-sm" type="button" data-act="lupa" style="justify-self:start">Lupa kata sandi?</button>
+          <div id="loginMsg">${ui.loginError ? `<div class="notice c-coral">${ic('alert')}<span>${esc(ui.loginError)}</span></div>` : ''}</div>
+          <button class="btn btn-primary" type="submit" id="loginBtn">Masuk</button>
+          <p class="small muted">Lupa kata sandi atau belum punya akun? Hubungi admin Kopma.</p>
         </form>
         <div class="divider"></div>
         <div style="display:grid;gap:10px">
-          <div><b>Coba sebagai…</b><p class="small muted">Akun demo. Kata sandi semuanya <b>kopma123</b>. Tiap peran melihat menu yang berbeda.</p></div>
+          <div><b>Coba mode demo</b><p class="small muted">Pakai data contoh, tidak tersambung ke data asli. Tiap peran melihat menu yang berbeda.</p></div>
           <div class="demo-accounts">
             ${demo.map(([id, r]) => { const p = prof(id); return `<button type="button" class="demo-acc c-${ROLES[r].color}" data-act="demo-login" data-id="${id}"><span class="avatar" style="width:36px;height:36px;background:var(--c);color:#fff">${esc(inisial(p.nama))}</span><span><b>${esc(ROLES[r].label)}</b><span>${esc(p.nama)}</span></span></button>`; }).join('')}
           </div>
@@ -242,17 +268,18 @@ function viewDasbor() {
   const salam = jam < 11 ? 'Selamat pagi' : jam < 15 ? 'Selamat siang' : jam < 18 ? 'Selamat sore' : 'Selamat malam';
   const roles = rolesOf(meId);
   const tiles = [];
-  tiles.push(`<a href="#poin" class="tile c-grape"><span class="t-icon">${ic('star')}</span><span class="t-val num">${fmtNum(saldoPoin(meId))}</span><span class="t-lbl">Poin belanjamu</span></a>`);
-  const feeBelum = feeOf(meId).filter((f) => !f.lunas).reduce((a, f) => a + f.nominal, 0);
-  tiles.push(`<a href="#fee" class="tile c-pink"><span class="t-icon">${ic('wallet')}</span><span class="t-val num">${rp(feeBelum)}</span><span class="t-lbl">Fee belum dibayar</span></a>`);
+  if (poinTersedia() && (!isLive() || p.nia)) tiles.push(`<a href="#poin" class="tile c-grape"><span class="t-icon">${ic('star')}</span><span class="t-val num">${fmtNum(saldoPoin(meId))}</span><span class="t-lbl">Poin belanjamu</span></a>`);
+  if (!isLive()) { const feeBelum = feeOf(meId).filter((f) => !f.lunas).reduce((a, f) => a + f.nominal, 0);
+    tiles.push(`<a href="#fee" class="tile c-pink"><span class="t-icon">${ic('wallet')}</span><span class="t-val num">${rp(feeBelum)}</span><span class="t-lbl">Fee belum dibayar</span></a>`); }
+  if (can.anggotaLiveView()) tiles.push(`<a href="#anggota" class="tile c-sky"><span class="t-icon">${ic('users')}</span><span class="t-val num">${Kasir.anggota.filter((x) => x.aktif !== false).length}</span><span class="t-lbl">Anggota terdaftar</span></a>`);
   if (can.rentalView()) {
     const aktif = db.booking.filter((b) => AKTIF.includes(b.status)).length;
     tiles.push(`<a href="#rental" class="tile c-tangerine"><span class="t-icon">${ic('cal')}</span><span class="t-val num">${aktif}</span><span class="t-lbl">Booking aktif</span></a>`);
   }
-  if (can.stokView() && Kasir.on) { const h = Kasir.penjualanHari(TODAY); tiles.push(`<a href="#stok" class="tile c-mint"><span class="t-icon">${ic('cart')}</span><span class="t-val num">${rp(h.total)}</span><span class="t-lbl">Penjualan hari ini · ${h.n} transaksi</span></a>`); }
-  if (can.stokView()) tiles.push(`<a href="#stok" class="tile c-lime" data-act="go-belanja"><span class="t-icon">${ic('cart')}</span><span class="t-val num">${perluBelanja().length}</span><span class="t-lbl">Barang perlu belanja</span></a>`);
+  if (stokTersedia() && Kasir.on) { const h = Kasir.penjualanHari(TODAY); tiles.push(`<a href="#stok" class="tile c-mint"><span class="t-icon">${ic('cart')}</span><span class="t-val num">${rp(h.total)}</span><span class="t-lbl">Penjualan hari ini · ${h.n} transaksi</span></a>`); }
+  if (stokTersedia()) tiles.push(`<a href="#stok" class="tile c-lime" data-act="go-belanja"><span class="t-icon">${ic('cart')}</span><span class="t-val num">${perluBelanja().length}</span><span class="t-lbl">Barang perlu belanja</span></a>`);
   if (can.anggotaFull()) tiles.push(`<a href="#anggota" class="tile c-sky"><span class="t-icon">${ic('users')}</span><span class="t-val num">${db.profil.filter((x) => x.aktif).length}</span><span class="t-lbl">Anggota terdaftar</span></a>`);
-  if (!can.rentalView()) tiles.push(`<a href="#anggota" class="tile c-mint"><span class="t-icon">${ic('check')}</span><span class="t-val">${simpananLunas(meId) ? 'Lunas' : 'Belum'}</span><span class="t-lbl">Status simpananmu</span></a>`);
+  if (!can.rentalView() && !isLive()) tiles.push(`<a href="#anggota" class="tile c-mint"><span class="t-icon">${ic('check')}</span><span class="t-val">${simpananLunas(meId) ? 'Lunas' : 'Belum'}</span><span class="t-lbl">Status simpananmu</span></a>`);
 
   const late = can.rentalView() ? db.booking.filter(terlambat) : [];
   const upcoming = can.rentalView() ? db.booking.filter((b) => ['Menunggu', 'Dikonfirmasi'].includes(b.status) && b.ambil >= TODAY && b.ambil <= addDays(TODAY, 7)).sort((a, b) => a.ambil.localeCompare(b.ambil)) : [];
@@ -263,7 +290,7 @@ function viewDasbor() {
   if (stokBisaDiubah()) quick.push(`<button class="btn btn-primary c-lime" data-act="mutasi" data-id="">${ic('box', 'icon-sm')}Catat stok</button>`);
   if (can.feeEdit()) quick.push(`<button class="btn btn-primary c-pink" data-act="fee-baru">${ic('wallet', 'icon-sm')}Catat fee</button>`);
 
-  const dampingan = db.profil.filter((x) => x.pendampingId === meId);
+  const dampingan = isLive() ? [] : db.profil.filter((x) => x.pendampingId === meId);
 
   return `
   <section class="hero">
@@ -289,15 +316,16 @@ function viewDasbor() {
       <div class="card-head"><h2>Ambil 7 hari ke depan</h2><a href="#rental" class="btn btn-soft btn-sm">Kalender</a></div>
       <div class="list">${upcoming.length ? upcoming.map(bookingRow).join('') : empty('cal', 'Belum ada jadwal ambil minggu ini.')}</div>
     </section>` : ''}
-    ${can.stokView() ? `
+    ${stokTersedia() ? `
     <section class="card c-lime">
       <div class="card-head"><h2>Perlu belanja</h2><a href="#stok" class="btn btn-soft btn-sm" data-act="go-belanja">Lihat stok</a></div>
       <div class="list">${perluBelanja().length ? perluBelanja().map(stokRow).join('') : empty('check', 'Semua stok di atas batas minimum.', 'mint')}</div>
     </section>` : ''}
-    <section class="card c-grape">
+    ${poinTersedia() && (!isLive() || p.nia) ? `<section class="card c-grape">
       <div class="card-head"><h2>Poin terakhirmu</h2><a href="#poin" class="btn btn-soft btn-sm">Riwayat</a></div>
       <div class="list">${Kasir.on ? (riwayatPoinKasir(Kasir.poinPer(db.pengaturan.rpPerPoin).get(me().nia), 4) || empty('star', 'Belum ada belanja dengan NIA-mu. Sebutkan NIA saat bayar di kasir.')) : (poinRows(db.poin.filter((x) => x.userId === meId).slice(-4).reverse(), false) || empty('star', 'Belum ada belanja tercatat. Sebutkan NIA saat belanja di Kopma Mart.'))}</div>
-    </section>
+    </section>` : ''}
+    ${can.anggotaLiveView() ? `<section class="card c-sky"><div class="card-head"><h2>Anggota terbaru</h2><a href="#anggota" class="btn btn-soft btn-sm">Semua</a></div><div class="list">${[...Kasir.anggota].sort((a, b) => String(b.dibuat || '').localeCompare(String(a.dibuat || ''))).slice(0, 4).map(anggotaLiveRow).join('') || empty('users', 'Belum ada data anggota.')}</div></section>` : ''}
     ${dampingan.length ? `
     <section class="card c-sky">
       <div class="card-head"><h2>Anggota dampinganmu</h2><span class="pill">${dampingan.length}</span></div>
@@ -329,7 +357,62 @@ function listAnggota() {
   if (f === 'dampingan') rows = rows.filter((p) => p.pendampingId === meId);
   return rows.length ? rows.map(anggotaRow).join('') : empty('search', 'Tidak ada anggota yang cocok. Coba nama atau NIA lain.');
 }
+/* ---------- Anggota (data asli di Firebase) ---------- */
+const FAKULTAS_UM = ['FIP', 'FS', 'FMIPA', 'FEB', 'FT', 'FIK', 'FIS', 'FPPsi', 'FK'];
+function anggotaLiveRow(a) {
+  const poin = Kasir.aksesKasir ? (Kasir.poinPer(db.pengaturan.rpPerPoin).get(a.nia)?.poin || 0) : null;
+  return `<div class="row click" data-act="anggota-live" data-nia="${esc(a.nia)}" role="button" tabindex="0" style="${a.aktif === false ? 'opacity:.55' : ''}">
+    ${avatar({ id: a.nia, nama: a.nama || '?' })}
+    <div class="grow"><div class="title">${esc(a.nama)}</div><div class="sub"><span class="num">${esc(a.nia)}</span> · ${esc(a.fakultas || '-')}, ${esc(a.prodi || '-')}</div></div>
+    <div class="end"><span class="pill c-${a.status === 'pengurus' ? 'sky' : 'mint'}">${a.status === 'pengurus' ? 'Pengurus' + (a.bidang ? ' · ' + esc(a.bidang) : '') : 'Anggota'}</span>${poin !== null ? `<span class="small muted num">${fmtNum(poin)} poin</span>` : ''}</div>
+  </div>`;
+}
+function listAnggotaLive() {
+  const q = (ui.q.anggotaLive || '').toLowerCase().trim();
+  let rows = Kasir.anggota.filter((a) => !q || [a.nama, a.nia, a.prodi, a.fakultas].some((v) => String(v || '').toLowerCase().includes(q)));
+  const f = ui.anggotaLiveFilter || 'semua';
+  if (f === 'anggota' || f === 'pengurus') rows = rows.filter((a) => a.status === f);
+  else if (f !== 'semua') rows = rows.filter((a) => a.fakultas === f);
+  if (rows.length) return rows.map(anggotaLiveRow).join('');
+  return Kasir.anggota.length ? empty('search', 'Tidak ada anggota yang cocok. Coba nama, NIA, atau prodi lain.') : empty('users', can.anggotaLiveEdit() ? 'Belum ada data anggota. Klik <b>Tambah anggota</b> untuk memasukkan yang pertama.' : 'Belum ada data anggota.', 'sky');
+}
+function viewAnggotaLive() {
+  const fak = [...new Set(Kasir.anggota.map((a) => a.fakultas).filter(Boolean))].sort();
+  const filters = [['semua', 'Semua', Kasir.anggota.length], ['anggota', 'Anggota', Kasir.anggota.filter((a) => a.status === 'anggota').length], ['pengurus', 'Pengurus', Kasir.anggota.filter((a) => a.status === 'pengurus').length], ...fak.map((x) => [x, x, Kasir.anggota.filter((a) => a.fakultas === x).length])];
+  return `
+  ${pageHead('Data anggota', `Tersimpan di Firebase, jadi sama di semua perangkat. ${can.anggotaLiveEdit() ? 'Ketua dan sekretaris bisa menambah dan mengubah.' : 'Kamu bisa melihat; perubahan oleh ketua atau sekretaris.'}`,
+    `${exportBtn('anggota')}${can.anggotaLiveEdit() ? `<button class="btn btn-primary" data-act="anggota-live-form">${ic('plus', 'icon-sm')}Tambah anggota</button>` : ''}`)}
+  ${Kasir.anggotaError ? `<div class="notice c-coral">${ic('alert')}<span>Data anggota gagal dimuat: ${esc(Kasir.anggotaError)}</span></div>` : ''}
+  <div class="toolbar"><div class="search">${ic('search')}<input class="input" id="qAnggotaLive" data-live="anggotaLive" placeholder="Cari nama, NIA, atau prodi…" value="${esc(ui.q.anggotaLive || '')}" aria-label="Cari anggota"></div></div>
+  <div class="chips">${filters.map(([k, l, n]) => `<button class="chip ${(ui.anggotaLiveFilter || 'semua') === k ? 'on' : ''}" data-act="anggota-live-filter" data-k="${esc(k)}">${esc(l)}<span class="count num">${n}</span></button>`).join('')}</div>
+  <div class="list" id="listAnggotaLive">${listAnggotaLive()}</div>`;
+}
+function formAnggotaLive(a) {
+  const fak = [...new Set([...FAKULTAS_UM, ...Kasir.anggota.map((x) => x.fakultas).filter(Boolean)])];
+  const prodi = [...new Set(Kasir.anggota.map((x) => x.prodi).filter(Boolean))].sort();
+  openModal(a ? 'Ubah data anggota' : 'Tambah anggota', `
+  <form class="form" data-form="anggotaLive" id="anggotaLiveForm"><input type="hidden" name="baru" value="${a ? '' : '1'}">
+    <div class="field"><label for="alNama">Nama lengkap</label><input class="input" id="alNama" name="nama" required minlength="2" value="${esc(a?.nama || '')}"></div>
+    <div class="field"><label for="alNia">NIA</label><input class="input num" id="alNia" name="nia" required autocapitalize="characters" value="${esc(a?.nia || '')}" ${a ? 'readonly' : ''} placeholder="contoh: 243600023"><span class="hint">${a ? 'NIA tidak bisa diubah karena menjadi kunci data dan poin.' : 'Huruf, angka, titik, strip, atau garis miring. Harus sama dengan yang diketik di kasir.'}</span></div>
+    <div class="form-row">
+      <div class="field"><label for="alFak">Fakultas</label><input class="input" id="alFak" name="fakultas" list="listFak" required value="${esc(a?.fakultas || '')}" placeholder="contoh: FMIPA"><datalist id="listFak">${fak.map((x) => `<option value="${esc(x)}">`).join('')}</datalist></div>
+      <div class="field"><label for="alProdi">Prodi</label><input class="input" id="alProdi" name="prodi" list="listProdi" required value="${esc(a?.prodi || '')}" placeholder="contoh: Fisika"><datalist id="listProdi">${prodi.map((x) => `<option value="${esc(x)}">`).join('')}</datalist></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label for="alStatus">Status</label><select class="input" id="alStatus" name="status"><option value="anggota" ${a?.status !== 'pengurus' ? 'selected' : ''}>Anggota</option><option value="pengurus" ${a?.status === 'pengurus' ? 'selected' : ''}>Pengurus</option></select></div>
+      <div class="field"><label for="alBidang">Bidang (kalau pengurus)</label><input class="input" id="alBidang" name="bidang" value="${esc(a?.bidang || '')}" placeholder="Usaha, PSDA, PHI…"></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label for="alAngkatan">Angkatan (opsional)</label><input class="input num" id="alAngkatan" name="angkatan" type="number" min="1990" max="2100" value="${esc(a?.angkatan || '')}"></div>
+      <div class="field"><label for="alWa">Nomor WA (opsional)</label><input class="input num" id="alWa" name="wa" inputmode="tel" value="${esc(a?.wa || '')}"></div>
+    </div>
+    ${a ? `<label class="chip ${a.aktif === false ? '' : 'on'}" style="width:fit-content"><input type="checkbox" name="aktif" ${a.aktif === false ? '' : 'checked'} data-live="rolechip" style="position:absolute;opacity:0;width:0">Masih aktif sebagai anggota</label>` : ''}
+    <div id="alMsg"></div>
+  </form>`, 'sky', `<button class="btn btn-ghost" data-act="close-modal">Batal</button><button class="btn btn-primary" form="anggotaLiveForm" type="submit" id="alSubmit">${a ? 'Simpan perubahan' : 'Tambah anggota'}</button>`);
+}
+
 function viewAnggota() {
+  if (isLive()) return viewAnggotaLive();
   if (!can.anggotaView()) return viewProfilSaya();
   const counts = {
     semua: db.profil.length, pengurus: db.profil.filter((p) => p.status === 'pengurus').length,
@@ -437,7 +520,7 @@ function kasirPanel() {
   if (Kasir.status === 'on') {
     const h = Kasir.penjualanHari(TODAY);
     return `<section class="card c-mint"><div class="card-head" style="margin:0"><div style="display:grid;gap:2px"><span class="pill" style="width:fit-content">Tersambung ke web kasir · baca saja</span><span class="small muted">${esc(Kasir.email)} · ${Kasir.products.length} produk · hari ini ${h.n} transaksi (${rp(h.total)})</span></div>
-      ${bisaAtur ? `<div class="actions"><button class="btn btn-soft btn-sm" data-act="kasir-backup">${ic('download', 'icon-sm')}Cadangkan data kasir</button><button class="btn btn-ghost btn-sm" data-act="kasir-putus">Putuskan</button></div>` : ''}</div></section>`;
+      ${bisaAtur ? `<div class="actions"><button class="btn btn-soft btn-sm" data-act="kasir-backup">${ic('download', 'icon-sm')}Cadangkan data kasir</button>${isLive() ? '' : '<button class="btn btn-ghost btn-sm" data-act="kasir-putus">Putuskan</button>'}</div>` : ''}</div></section>`;
   }
   if (Kasir.status === 'connecting') return `<section class="card c-mint"><span class="pill">Menyambungkan ke web kasir…</span></section>`;
   const err = Kasir.status === 'error' ? `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir.error)}</span></div>` : '';
@@ -566,7 +649,7 @@ function riwayatPoinKasir(d, max = 50) {
   return d.riwayat.slice(0, max).map((r) => `<div class="row"><span class="stripe c-grape"></span><div class="grow"><div class="title">Belanja ${rp(r.total)}</div><div class="sub">${r.item} barang · kasir ${esc(r.kasir)} · ${waktu(r.waktu)}</div></div><div class="end"><b class="num" style="font-size:1.1rem;color:var(--grape-ink)">+${fmtNum(r.poin)}</b></div></div>`).join('');
 }
 function kartuPoinNia(nia, d) {
-  const p = db.profil.find((x) => x.nia === nia);
+  const p = anggotaByNia(nia);
   return `<section class="card c-grape" style="background:linear-gradient(135deg,var(--grape-soft),var(--pink-soft))">
     <span class="eyebrow">${p ? esc(p.nama) + ' · ' : ''}NIA <span class="num">${esc(nia)}</span></span>
     <div class="bignum num" style="color:var(--grape-ink)">${fmtNum(d?.poin || 0)}</div>
@@ -594,7 +677,7 @@ function viewPoinKasir() {
     body = `
     ${can.poinRumus() ? `<section class="card c-sun"><form class="toolbar" data-form="rumus"><div class="field" style="flex:1 1 220px"><label for="rateInput">Rumus poin (bendahara)</label><div class="toolbar"><span>1 poin setiap</span><input class="input num" id="rateInput" name="rate" type="number" min="100" step="100" value="${rate}" style="max-width:140px"><span>rupiah</span></div><span class="hint">Berlaku untuk semua transaksi, termasuk yang lama, karena poin dihitung ulang dari data kasir.</span></div><button class="btn btn-primary" type="submit">Simpan rumus</button></form></section>` : ''}
     <section class="card c-grape"><div class="card-head"><h2>Peringkat poin</h2><span class="pill">${rank.length} NIA</span></div>
-      <div class="list">${rank.length ? rank.map((d, i) => { const p = db.profil.find((x) => x.nia === d.nia); return `<div class="row click" data-act="lihat-nia" data-nia="${esc(d.nia)}" role="button" tabindex="0"><span class="avatar c-${colors[i % colors.length]}" style="width:34px;height:34px">${i + 1}</span><div class="grow"><div class="title">${p ? esc(p.nama) : `<span class="num">${esc(d.nia)}</span>`}</div><div class="sub">${p ? `<span class="num">${esc(d.nia)}</span> · ` : 'Belum terdaftar di Kopma Hub · '}${d.n}× belanja · ${rp(d.belanja)}</div><div class="meter c-${colors[i % colors.length]}" style="margin-top:6px"><i style="width:${Math.round((d.poin / max) * 100)}%"></i></div></div><div class="end"><b class="num">${fmtNum(d.poin)}</b></div></div>`; }).join('') : empty('star', 'Belum ada transaksi kasir yang diisi NIA anggota.', 'grape')}</div>
+      <div class="list">${rank.length ? rank.map((d, i) => { const p = anggotaByNia(d.nia); return `<div class="row click" data-act="lihat-nia" data-nia="${esc(d.nia)}" role="button" tabindex="0"><span class="avatar c-${colors[i % colors.length]}" style="width:34px;height:34px">${i + 1}</span><div class="grow"><div class="title">${p ? esc(p.nama) : `<span class="num">${esc(d.nia)}</span>`}</div><div class="sub">${p ? `<span class="num">${esc(d.nia)}</span> · ` : 'Belum terdaftar di data anggota · '}${d.n}× belanja · ${rp(d.belanja)}</div><div class="meter c-${colors[i % colors.length]}" style="margin-top:6px"><i style="width:${Math.round((d.poin / max) * 100)}%"></i></div></div><div class="end"><b class="num">${fmtNum(d.poin)}</b></div></div>`; }).join('') : empty('star', 'Belum ada transaksi kasir yang diisi NIA anggota.', 'grape')}</div>
     </section>`;
   }
   return `${pageHead('Poin anggota', 'Poin tercatat otomatis setiap kasir mengisi NIA anggota saat pembayaran.', exportBtn('poin'))}
@@ -873,7 +956,17 @@ const ACT = {
     root.dataset.theme = dark ? 'light' : 'dark'; Store.setPref('theme', root.dataset.theme); closeModal();
   },
   'reset-demo': () => confirmBox('Kembalikan data contoh?', 'Semua perubahan yang kamu buat di browser ini akan hilang.', 'Ya, kembalikan', () => { db = Store.reset(); save(); closeModal(); render(); toast('Data contoh dikembalikan', 'sky'); }),
-  logout: () => { meId = null; Store.setPref('me', ''); closeModal(); location.hash = ''; render(); },
+  logout: async () => { const live = isLive(); meId = null; Store.setPref('me', ''); closeModal(); location.hash = ''; ui.loginError = ''; if (live) await Kasir.disconnect(); render(); },
+  'anggota-live-filter': (el) => { ui.anggotaLiveFilter = el.dataset.k; render(); },
+  'anggota-live-form': (el) => formAnggotaLive(el.dataset.nia ? Kasir.anggota.find((a) => a.nia === el.dataset.nia) : null),
+  'anggota-live': (el) => {
+    const a = Kasir.anggota.find((x) => x.nia === el.dataset.nia); if (!a) return;
+    const d = Kasir.aksesKasir ? Kasir.poinPer(db.pengaturan.rpPerPoin).get(a.nia) : null;
+    openModal('Data anggota', `<div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">${avatar({ id: a.nia, nama: a.nama }, 56)}<div><h2>${esc(a.nama)}</h2><p class="muted num">NIA ${esc(a.nia)}</p></div></div>
+      <dl class="kv"><dt>Fakultas</dt><dd>${esc(a.fakultas || '-')}</dd><dt>Prodi</dt><dd>${esc(a.prodi || '-')}</dd><dt>Status</dt><dd>${a.status === 'pengurus' ? 'Pengurus' + (a.bidang ? ' · ' + esc(a.bidang) : '') : 'Anggota'}${a.aktif === false ? ' (tidak aktif)' : ''}</dd>${a.angkatan ? `<dt>Angkatan</dt><dd class="num">${esc(a.angkatan)}</dd>` : ''}${a.wa ? `<dt>WhatsApp</dt><dd class="num">${esc(a.wa)}</dd>` : ''}<dt>Ditambahkan</dt><dd>${a.dibuat ? waktu(a.dibuat) : '-'}${a.dibuatOleh ? ' · ' + esc(a.dibuatOleh) : ''}</dd>${a.diubah ? `<dt>Terakhir diubah</dt><dd>${waktu(a.diubah)} · ${esc(a.diubahOleh || '')}</dd>` : ''}</dl>
+      ${Kasir.aksesKasir ? `<div class="notice c-grape" style="margin-top:14px">${ic('star')}<span>Poin dari kasir: <b class="num">${fmtNum(d?.poin || 0)}</b>${d ? ` · ${d.n}× belanja, ${rp(d.belanja)}` : ''}</span></div>` : ''}`, 'sky',
+      can.anggotaLiveEdit() ? `<button class="btn btn-primary" data-act="anggota-live-form" data-nia="${esc(a.nia)}">${ic('edit', 'icon-sm')}Ubah data</button>` : '');
+  },
   'close-modal': () => closeModal(),
 
   'go-belanja': () => { ui.stokTab = 'belanja'; },
@@ -1011,10 +1104,10 @@ const ACT = {
   export: (el) => {
     const k = el.dataset.kind;
     const T = {
-      anggota: [['Nama', 'NIA', 'Prodi', 'Angkatan', 'WA', 'Status', 'Bidang', 'Pendamping', 'Simpanan lunas'], db.profil.map((p) => [p.nama, p.nia, p.prodi, p.angkatan, p.wa, p.status, p.bidang || '', p.pendampingId ? prof(p.pendampingId).nama : '', simpananLunas(p.id) ? 'Ya' : 'Belum'])],
+      anggota: isLive() ? [['Nama', 'NIA', 'Fakultas', 'Prodi', 'Status', 'Bidang', 'Angkatan', 'WA', 'Aktif'], Kasir.anggota.map((a) => [a.nama, a.nia, a.fakultas || '', a.prodi || '', a.status, a.bidang || '', a.angkatan || '', a.wa || '', a.aktif === false ? 'Tidak' : 'Ya'])] : [['Nama', 'NIA', 'Prodi', 'Angkatan', 'WA', 'Status', 'Bidang', 'Pendamping', 'Simpanan lunas'], db.profil.map((p) => [p.nama, p.nia, p.prodi, p.angkatan, p.wa, p.status, p.bidang || '', p.pendampingId ? prof(p.pendampingId).nama : '', simpananLunas(p.id) ? 'Ya' : 'Belum'])],
       stok: [['Barang', 'Kategori', 'Harga beli', 'Harga jual', 'Stok', 'Minimum'], martItems().map((b) => [b.nama, b.kategori, b.hargaBeli, b.hargaJual, b.stok, b.min])],
       booking: [['Penyewa', 'WA', 'Barang', 'Unit', 'Ambil', 'Kembali', 'Total', 'Status'], db.booking.map((b) => [b.penyewa, b.wa, db.barangSewa.find((x) => x.id === b.barangId).nama, b.unit, b.ambil, b.kembali, b.total, b.status])],
-      poin: Kasir.on ? [['NIA', 'Nama', 'Jumlah belanja', 'Total belanja', 'Poin', 'Terakhir belanja'], [...Kasir.poinPer(db.pengaturan.rpPerPoin).values()].map((d) => [d.nia, db.profil.find((x) => x.nia === d.nia)?.nama || '', d.n, d.belanja, d.poin, d.terakhir])] : [['Anggota', 'NIA', 'Belanja', 'Poin', 'Alasan', 'Pencatat', 'Waktu'], db.poin.map((x) => [prof(x.userId).nama, prof(x.userId).nia, x.belanja, x.poin, x.alasan, prof(x.olehId).nama, x.waktu])],
+      poin: Kasir.on ? [['NIA', 'Nama', 'Jumlah belanja', 'Total belanja', 'Poin', 'Terakhir belanja'], [...Kasir.poinPer(db.pengaturan.rpPerPoin).values()].map((d) => [d.nia, anggotaByNia(d.nia)?.nama || '', d.n, d.belanja, d.poin, d.terakhir])] : [['Anggota', 'NIA', 'Belanja', 'Poin', 'Alasan', 'Pencatat', 'Waktu'], db.poin.map((x) => [prof(x.userId).nama, prof(x.userId).nia, x.belanja, x.poin, x.alasan, prof(x.olehId).nama, x.waktu])],
       fee: [['Penerima', 'Jenis', 'Kegiatan', 'Nominal', 'Tanggal', 'Dibayar'], db.fee.map((f) => [prof(f.userId).nama, f.jenis, f.kegiatan, f.nominal, f.tanggal, f.lunas ? 'Ya' : 'Belum'])],
     }[k];
     const csv = [T[0], ...T[1]].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -1055,6 +1148,7 @@ const LIVE = {
     previewPoin();
   },
   nominal: () => { startTimer(); previewPoin(); },
+  anggotaLive: (el) => { ui.q.anggotaLive = el.value; $('#listAnggotaLive').innerHTML = listAnggotaLive(); },
   ceknia: (el) => { ui.q.ceknia = el.value; $('#cekHasil').innerHTML = hasilCekNia(); },
   opname: () => {
     let n = 0, beda = 0;
@@ -1073,12 +1167,26 @@ const LIVE = {
 
 /* ================= Submit form ================= */
 const FORM = {
-  login: (f) => {
-    const id = f.id.value.trim().toLowerCase(); const p = db.profil.find((x) => x.email.toLowerCase() === id || x.nia.toLowerCase() === id);
-    const msg = $('#loginMsg');
-    if (!p || f.pass.value !== 'kopma123') { msg.innerHTML = `<div class="notice c-coral">${ic('alert')}<span>Halaman ini masih mode demo, jadi akun kasir belum bisa dipakai di sini. Pilih salah satu akun demo di bawah, lalu sambungkan akun kasir lewat menu <b>Stok Mart</b>.</span></div>`; return; }
-    if (!p.aktif) { msg.innerHTML = `<div class="notice c-coral">${ic('alert')}<span>Akun ini sudah dinonaktifkan. Hubungi super admin.</span></div>`; return; }
-    ACT['demo-login']({ dataset: { id: p.id } });
+  login: async (f) => {
+    const btn = $('#loginBtn'); btn.disabled = true; btn.textContent = 'Memeriksa…'; ui.loginError = '';
+    await Kasir.connect(f.id.value.trim(), f.pass.value);
+    if (Kasir.status === 'error') { btn.disabled = false; btn.textContent = 'Masuk'; $('#loginMsg').innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir.error)}</span></div>`; return; }
+    meId = LIVE_ID; Store.setPref('me', LIVE_ID); location.hash = 'dasbor'; render();
+  },
+  anggotaLive: async (f) => {
+    const baru = f.baru.value === '1';
+    const data = { nama: f.nama.value.trim().replace(/\s+/g, ' '), nia: normNia(f.nia.value), fakultas: f.fakultas.value.trim(), prodi: f.prodi.value.trim(), status: f.status.value, bidang: f.bidang.value.trim() || null, angkatan: f.angkatan.value ? Number(f.angkatan.value) : null, wa: f.wa.value.trim() || null };
+    if (!baru) data.aktif = !!f.aktif?.checked;
+    const msg = $('#alMsg'); const err = (t) => { msg.innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(t)}</span></div>`; };
+    if (data.nama.length < 2) return err('Nama minimal 2 huruf.');
+    if (!/^[A-Z0-9.\-\/]{3,20}$/.test(data.nia)) return err('NIA hanya boleh huruf, angka, titik, strip, atau garis miring (3-20 karakter).');
+    const btn = $('#alSubmit'); btn.disabled = true; btn.textContent = 'Menyimpan…';
+    try {
+      await Kasir.simpanAnggota(data, baru);
+      closeModal(); toast(baru ? `${esc(data.nama)} ditambahkan` : `Data ${esc(data.nama)} diperbarui`, 'sky');
+      if (baru) { ui.q.anggotaLive = ''; ui.anggotaLiveFilter = 'semua'; }
+      render();
+    } catch (e) { btn.disabled = false; btn.textContent = baru ? 'Tambah anggota' : 'Simpan perubahan'; err(Kasir._pesan(e)); }
   },
   lupa: (f) => { closeModal(); toast(`Tautan atur ulang dikirim ke ${esc(f.email.value)} (simulasi)`, 'sky'); },
   booking: (f) => {
@@ -1191,11 +1299,12 @@ window.addEventListener('hashchange', () => { closeModal(); render(); window.scr
   const t = Store.getPref('theme', ''); if (t) document.documentElement.dataset.theme = t;
   if (meId === '') meId = null;
   Kasir.onChange = () => {
-    if (!me() || !['stok', 'dasbor', 'poin'].includes(ui.view) || $('#modalBack')) return;
+    if (isLive() && !Kasir.on) { if (!$('#loginForm')) render(); return; }
+    if (!me() || !['stok', 'dasbor', 'poin', 'anggota'].includes(ui.view) || $('#modalBack')) return;
     const a = document.activeElement;
-    if (a && a.matches('input, select, textarea') && $('#main')?.contains(a)) { if ($('#listStok')) $('#listStok').innerHTML = listStok(); return; }
+    if (a && a.matches('input, select, textarea') && $('#main')?.contains(a)) { if ($('#listStok')) $('#listStok').innerHTML = listStok(); if ($('#listAnggotaLive')) $('#listAnggotaLive').innerHTML = listAnggotaLive(); return; }
     render();
   };
+  Kasir.resume(); // memulihkan sesi login dulu (langsung berstatus "connecting"), baru menggambar halaman
   render();
-  Kasir.resume();
 })();

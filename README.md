@@ -29,6 +29,16 @@ Ini **mode demo**: data contoh disimpan di browser (localStorage). Perubahan han
 
 Tambahan: halaman **Jejak** (siapa mengubah apa), **ekspor CSV** untuk PHI, mode gelap.
 
+## Login sungguhan dan data anggota
+
+Halaman masuk Kopma Hub memakai **akun Kopma** (akun Firebase yang sama dengan web kasir). Akun demo tetap ada di bagian bawah untuk mencoba tanpa data asli.
+
+- **Data anggota** tersimpan di Firestore koleksi `anggota` (ID dokumen = NIA), jadi sama di semua perangkat.
+- **Ketua dan sekretaris** bisa menambah dan mengubah. Bendahara dan admin kasir hanya melihat. NIA tidak bisa ganda dan data tidak bisa dihapus (cukup ditandai tidak aktif).
+- Poin dari kasir otomatis tampil dengan nama anggota.
+- Selama memakai akun sungguhan, modul yang datanya belum di Firebase (rental, fee, akun & peran, jejak) disembunyikan supaya tidak tercampur data contoh.
+- Cara memberi peran ketua/sekretaris: lihat `firebase/README.md`.
+
 ## Sambungan ke web kasir
 
 Modul Stok bisa membaca data langsung dari web kasir (repo `KasirKopmaUM2026`, Firebase project `kopma-um`).

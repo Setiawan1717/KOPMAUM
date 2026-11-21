@@ -4,7 +4,7 @@ rules_version = '2';
 // Disusun dari semua operasi baca/tulis yang ada di web kasir (KasirKopmaUM2026/index.html):
 //  - role "kasir": jualan (kurangi stok produk + buat transaksi)
 //  - role "admin": semua menu kasir (produk, barang masuk, riwayat, laporan, pengeluaran, modal harian)
-//  - Kopma Hub: hanya membaca, memakai akun kasir/admin
+//  - Kopma Hub: membaca data kasir; ketua & sekretaris mengelola koleksi anggota
 // Semua yang tidak disebut di bawah otomatis DITOLAK.
 
 service cloud.firestore {
@@ -15,6 +15,8 @@ service cloud.firestore {
     function terdaftar() { return masuk() && exists(/databases/$(database)/documents/users/$(request.auth.uid)); }
     function admin() { return terdaftar() && akun().role == 'admin'; }
     function petugas() { return terdaftar() && akun().role in ['admin', 'kasir']; }
+    // peran di Kopma Hub disimpan di field "hub" (daftar) pada dokumen users, contoh: ["ketua"]
+    function punyaHub(daftar) { return terdaftar() && akun().get('hub', []).hasAny(daftar); }
 
     // ---------- Akun ----------
     // Akun baru TIDAK bisa mendaftarkan dirinya sendiri (apalagi sebagai admin).
@@ -23,6 +25,18 @@ service cloud.firestore {
       allow read: if masuk() && (request.auth.uid == uid || admin());
       allow update, delete: if admin();
       allow create: if admin();
+    }
+
+    // ---------- Data anggota (Kopma Hub) ----------
+    // ID dokumen = NIA, jadi satu NIA tidak bisa terdaftar dua kali. Data tidak pernah dihapus.
+    match /anggota/{nia} {
+      allow read: if punyaHub(['ketua', 'sekretaris', 'bendahara']) || admin();
+      allow create, update: if punyaHub(['ketua', 'sekretaris'])
+        && request.resource.data.nia == nia
+        && request.resource.data.keys().hasOnly(['nia', 'nama', 'fakultas', 'prodi', 'angkatan', 'wa', 'status', 'bidang', 'aktif', 'dibuat', 'dibuatOleh', 'diubah', 'diubahOleh'])
+        && request.resource.data.nama is string && request.resource.data.nama.size() >= 2
+        && request.resource.data.status in ['anggota', 'pengurus'];
+      allow delete: if false;
     }
 
     // ---------- Produk ----------
