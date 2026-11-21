@@ -1,6 +1,6 @@
 # Aturan keamanan Firestore (project kopma-um)
 
-`firestore.rules` mengunci database web kasir supaya aman dipakai bersama Kopma Hub. Aturan ini disusun dari semua operasi yang ada di kode web kasir, dan sudah diuji di Firestore Emulator: 20 alur kasir tetap jalan dan 17 percobaan penyalahgunaan ditolak. Aturan koleksi `anggota` diuji terpisah: 7 akses yang sah berhasil dan 12 percobaan yang tidak sah ditolak. Web kasir versi perbaikan juga sudah diuji ujung ke ujung (login, jualan dengan NIA, stok berkurang) terhadap aturan ini.
+`firestore.rules` mengunci database web kasir supaya aman dipakai bersama Kopma Hub. Aturan ini disusun dari semua operasi yang ada di kode web kasir, dan sudah diuji di Firestore Emulator: 20 alur kasir tetap jalan dan 17 percobaan penyalahgunaan ditolak. Aturan koleksi `anggota` diuji terpisah (19 kasus), begitu juga pendaftaran dengan kode, perbarui data sendiri, dan pengaturan peran (38 kasus). Web kasir versi perbaikan juga sudah diuji ujung ke ujung (login, jualan dengan NIA, stok berkurang) terhadap aturan ini.
 
 ## Masalah yang ditutup
 
@@ -26,22 +26,32 @@ Di web kasir, pendaftaran akun baru dijaga PIN yang ditulis langsung di kode. Re
 4. **Coba kasir.** Login sebagai kasir, lakukan satu transaksi kecil, lalu hapus transaksinya sebagai admin. Coba juga barang masuk dan laporan harian.
 5. **Kalau ada yang rusak:** tab Rules → riwayat versi (ikon jam) → pilih versi sebelumnya → kembalikan. Lalu kabari pesan error-nya.
 
-## Peran Kopma Hub (ketua, sekretaris, dan lainnya)
+## Pendaftaran akun, peran, dan data diri (lewat Kopma Hub)
 
-Kopma Hub memakai akun yang sama dengan web kasir. Perannya di Kopma Hub ditulis di dokumen `users` akun tersebut, pada field **`hub`** (tipe *array*).
+Akun Kopma Hub sama dengan akun web kasir. Setelah langkah awal di bawah, semuanya diatur dari Kopma Hub dan **tidak perlu Firebase Console lagi**.
 
-| Isi `hub` | Bisa apa di Kopma Hub |
+### Langkah awal (sekali saja, di Firebase Console)
+
+1. **Simpan kode pendaftaran.** Firestore Database → **Start collection** → ID koleksi `pengaturan` → ID dokumen `pendaftaran` → field `kode` (string) berisi kode pendaftaranmu.
+   - Kode ini **tidak pernah** ditulis di repo. Tidak ada aplikasi yang bisa membacanya; hanya aturan Firestore yang mencocokkannya saat orang mendaftar.
+   - Mengganti kode cukup dengan mengubah field ini. Kode lama langsung tidak berlaku.
+2. **Pastikan pendaftaran Firebase menyala.** Authentication → Settings → User actions → **Enable create (sign-up)** harus dicentang.
+3. **Jadikan dirimu ketua** (sekali saja): `users` → dokumen akunmu → field `hub` (array) berisi `ketua`. Setelah itu peran orang lain diatur dari Kopma Hub.
+4. **Publish ulang** isi `firestore.rules` terbaru.
+
+### Cara kerjanya
+
+| Siapa | Bisa apa |
 | --- | --- |
-| `ketua` atau `sekretaris` | Melihat, menambah, dan mengubah **data anggota** |
-| `bendahara` | Melihat data anggota |
-| (tanpa `hub`, role kasir `admin`) | Melihat data anggota, stok, dan poin |
-| (tanpa `hub`, role kasir `kasir`) | Melihat stok dan poin |
+| Calon pengguna | **Daftar** di halaman masuk Kopma Hub dengan kode pendaftaran, NIA, nama pengguna, dan kata sandi. Syarat: kode benar, NIA sudah ada di data anggota, dan NIA belum dipakai akun lain. Akun baru selalu berperan *anggota*. |
+| Pemilik akun | **Profil saya → Perbarui data**: nama, fakultas, prodi, angkatan, nomor WA. Status dan bidang tidak bisa diubah sendiri. Melihat poin dari transaksi dengan NIA miliknya saja. |
+| Ketua & sekretaris | Menambah dan mengubah data semua anggota. **Akun & peran → Atur peran**: memberi peran ketua, sekretaris, bendahara, bidang usaha, petugas jaga, atau pengurus ke akun lain (tidak bisa ke diri sendiri). |
+| Bendahara | Melihat data anggota. |
+| Admin kasir | Tetap satu-satunya yang mengatur role kasir (`admin`/`kasir`) lewat Firebase Console. |
 
-**Menjadikan akun yang sudah ada sebagai ketua:** Firestore Database → `users` → klik dokumen akunnya → **Add field**: nama `hub`, tipe **array**, isi satu elemen string `ketua`. Boleh juga tambahkan field `nama` (string, nama lengkap) dan `nia` (string) supaya nama dan poinnya muncul di dasbor.
+Akun lama yang belum punya NIA (misalnya akun kasir) bisa menghubungkan NIA-nya sendiri di **Profil saya**. Satu NIA hanya bisa untuk satu akun; kalau ada yang salah klaim, admin bisa menghapus dokumennya di koleksi `klaim_nia`.
 
-**Akun untuk pengurus yang tidak memegang kasir** (misalnya sekretaris): buat seperti akun kasir baru di bawah, tetapi isi `role` dengan `pengurus` dan tambahkan `hub` berisi `sekretaris`. Akun `pengurus` tidak bisa membuka data kasir.
-
-> Setiap kali `firestore.rules` di repo ini diperbarui, salin ulang isinya ke tab **Rules** lalu **Publish**. Tanpa itu, Firestore masih memakai aturan lama dan menolak penyimpanan data anggota.
+Akun anggota/pengurus hasil pendaftaran **tidak bisa** dipakai di web kasir.
 
 ## Membuat akun kasir baru
 

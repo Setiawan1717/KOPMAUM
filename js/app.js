@@ -66,7 +66,7 @@ const save = () => Store.save(db);
    Peran Kopma Hub diambil dari field "hub" di dokumen users; role kasir "admin"/"kasir" ikut dipetakan. */
 const LIVE_ID = 'live';
 const isLive = () => meId === LIVE_ID;
-const liveProfil = () => { const a = Kasir.akun || {}; const dariAnggota = a.nia ? Kasir.anggota.find((x) => x.nia === a.nia) : null;
+const liveProfil = () => { const a = Kasir.akun || {}; const dariAnggota = Kasir.dataSaya;
   return { id: LIVE_ID, nama: a.nama || dariAnggota?.nama || a.username || 'Pengguna', nia: a.nia || '', email: (a.username || '') + ' · akun Kopma', prodi: dariAnggota?.prodi || '', angkatan: dariAnggota?.angkatan || '', wa: '', status: 'pengurus', bidang: null, pendampingId: null, bergabung: TODAY, aktif: true }; };
 const me = () => (isLive() ? (Kasir.on && Kasir.akun ? liveProfil() : null) : db.profil.find((p) => p.id === meId));
 const prof = (id) => (id === LIVE_ID ? me() : db.profil.find((p) => p.id === id)) || { id: 'x', nama: 'Tidak dikenal', nia: '-' };
@@ -110,7 +110,7 @@ const can = {
 can.anggotaLiveView = () => isLive() && (has('ketua', 'sekretaris', 'bendahara') || Kasir.akun?.role === 'admin');
 can.anggotaLiveEdit = () => isLive() && has('ketua', 'sekretaris');
 const stokTersedia = () => can.stokView() && (!isLive() || Kasir.aksesKasir);
-const poinTersedia = () => !isLive() || Kasir.aksesKasir;
+const poinTersedia = () => !isLive() || Kasir.aksesKasir || !!Kasir.akun?.nia;
 
 function catat(modul, aksi) { db.log.unshift({ id: uid('l'), olehId: meId, modul, aksi, waktu: nowIso() }); }
 
@@ -152,12 +152,12 @@ const feeOf = (id) => db.fee.filter((f) => f.userId === id).sort((a, b) => b.tan
 /* ================= Navigasi ================= */
 const NAV = [
   { id: 'dasbor', label: 'Dasbor', icon: 'home', color: 'sun', show: () => true },
-  { id: 'anggota', label: 'Anggota', icon: 'users', color: 'sky', show: () => (isLive() ? can.anggotaLiveView() : true), labelFn: () => (can.anggotaView() || isLive() ? 'Anggota' : 'Profil saya') },
+  { id: 'anggota', label: 'Anggota', icon: 'users', color: 'sky', show: () => true, labelFn: () => ((isLive() ? can.anggotaLiveView() : can.anggotaView()) ? 'Anggota' : 'Profil saya') },
   { id: 'stok', label: 'Stok Mart', icon: 'box', color: 'lime', show: () => stokTersedia() },
   { id: 'rental', label: 'Rental', icon: 'cal', color: 'tangerine', show: () => can.rentalView() },
   { id: 'poin', label: 'Poin', icon: 'star', color: 'grape', show: () => poinTersedia() },
   { id: 'fee', label: 'Fee & gaji', icon: 'wallet', color: 'pink', show: () => !isLive() },
-  { id: 'akun', label: 'Akun & peran', icon: 'shield', color: 'mint', show: () => can.akunView() },
+  { id: 'akun', label: 'Akun & peran', icon: 'shield', color: 'mint', show: () => (isLive() ? Kasir.kelolaAkun : can.akunView()) },
   { id: 'jejak', label: 'Jejak', icon: 'history', color: 'coral', show: () => can.jejak() },
 ];
 const navLabel = (n) => (n.labelFn ? n.labelFn() : n.label);
@@ -247,8 +247,21 @@ function viewLogin() {
           <div class="field"><label for="loginPass">Kata sandi</label><input class="input" id="loginPass" name="pass" type="password" autocomplete="current-password" placeholder="••••••••" required></div>
           <div id="loginMsg">${ui.loginError ? `<div class="notice c-coral">${ic('alert')}<span>${esc(ui.loginError)}</span></div>` : ''}</div>
           <button class="btn btn-primary" type="submit" id="loginBtn">Masuk</button>
-          <p class="small muted">Lupa kata sandi atau belum punya akun? Hubungi admin Kopma.</p>
+          <p class="small muted">Lupa kata sandi? Hubungi admin Kopma.</p>
         </form>
+        <section class="card c-grape" style="box-shadow:none">
+          ${ui.daftar ? `
+          <form class="form" data-form="daftar" id="daftarForm" autocomplete="off">
+            <div class="card-head" style="margin:0"><h3>Daftar akun baru</h3><button type="button" class="btn btn-ghost btn-sm" data-act="daftar-tutup">Batal</button></div>
+            <p class="small muted">Butuh kode pendaftaran dari pengurus. NIA-mu harus sudah dimasukkan ketua atau sekretaris ke data anggota.</p>
+            <div class="field"><label for="dfKode">Kode pendaftaran</label><input class="input" id="dfKode" name="kode" type="password" required autocomplete="off"></div>
+            <div class="field"><label for="dfNia">NIA</label><input class="input num" id="dfNia" name="nia" required autocapitalize="characters" placeholder="NIA sesuai kartu anggota"></div>
+            <div class="field"><label for="dfUser">Nama pengguna</label><input class="input" id="dfUser" name="user" required autocapitalize="none" pattern="[A-Za-z0-9._\-]{3,30}" placeholder="huruf/angka tanpa spasi, untuk login"><span class="hint">Dipakai untuk login di Kopma Hub.</span></div>
+            <div class="form-row"><div class="field"><label for="dfPass">Kata sandi</label><input class="input" id="dfPass" name="pass" type="password" minlength="6" required autocomplete="new-password"></div><div class="field"><label for="dfPass2">Ulangi kata sandi</label><input class="input" id="dfPass2" name="pass2" type="password" minlength="6" required autocomplete="new-password"></div></div>
+            <div id="daftarMsg"></div>
+            <button class="btn btn-primary" type="submit" id="daftarBtn">Daftar</button>
+          </form>` : `<div class="card-head" style="margin:0"><div><b>Belum punya akun?</b><p class="small muted">Daftar sendiri dengan kode pendaftaran dari pengurus.</p></div><button type="button" class="btn btn-soft" data-act="daftar-buka">Daftar</button></div>`}
+        </section>
         <div class="divider"></div>
         <div style="display:grid;gap:10px">
           <div><b>Coba mode demo</b><p class="small muted">Pakai data contoh, tidak tersambung ke data asli. Tiap peran melihat menu yang berbeda.</p></div>
@@ -387,32 +400,46 @@ function viewAnggotaLive() {
   <div class="chips">${filters.map(([k, l, n]) => `<button class="chip ${(ui.anggotaLiveFilter || 'semua') === k ? 'on' : ''}" data-act="anggota-live-filter" data-k="${esc(k)}">${esc(l)}<span class="count num">${n}</span></button>`).join('')}</div>
   <div class="list" id="listAnggotaLive">${listAnggotaLive()}</div>`;
 }
-function formAnggotaLive(a) {
+function formAnggotaLive(a, sendiri = false) {
   const fak = [...new Set([...FAKULTAS_UM, ...Kasir.anggota.map((x) => x.fakultas).filter(Boolean)])];
   const prodi = [...new Set(Kasir.anggota.map((x) => x.prodi).filter(Boolean))].sort();
-  openModal(a ? 'Ubah data anggota' : 'Tambah anggota', `
-  <form class="form" data-form="anggotaLive" id="anggotaLiveForm"><input type="hidden" name="baru" value="${a ? '' : '1'}">
+  openModal(sendiri ? 'Perbarui data saya' : a ? 'Ubah data anggota' : 'Tambah anggota', `
+  <form class="form" data-form="anggotaLive" id="anggotaLiveForm"><input type="hidden" name="baru" value="${a ? '' : '1'}"><input type="hidden" name="sendiri" value="${sendiri ? '1' : ''}">
     <div class="field"><label for="alNama">Nama lengkap</label><input class="input" id="alNama" name="nama" required minlength="2" value="${esc(a?.nama || '')}"></div>
     <div class="field"><label for="alNia">NIA</label><input class="input num" id="alNia" name="nia" required autocapitalize="characters" value="${esc(a?.nia || '')}" ${a ? 'readonly' : ''} placeholder="NIA sesuai kartu anggota"><span class="hint">${a ? 'NIA tidak bisa diubah karena menjadi kunci data dan poin.' : 'Huruf, angka, titik, strip, atau garis miring. Harus sama dengan yang diketik di kasir.'}</span></div>
     <div class="form-row">
       <div class="field"><label for="alFak">Fakultas</label><input class="input" id="alFak" name="fakultas" list="listFak" required value="${esc(a?.fakultas || '')}" placeholder="contoh: FMIPA"><datalist id="listFak">${fak.map((x) => `<option value="${esc(x)}">`).join('')}</datalist></div>
       <div class="field"><label for="alProdi">Prodi</label><input class="input" id="alProdi" name="prodi" list="listProdi" required value="${esc(a?.prodi || '')}" placeholder="contoh: Fisika"><datalist id="listProdi">${prodi.map((x) => `<option value="${esc(x)}">`).join('')}</datalist></div>
     </div>
-    <div class="form-row">
+    ${sendiri ? `<p class="small muted">Status (${a.status === 'pengurus' ? 'pengurus' : 'anggota'}${a.bidang ? ', ' + esc(a.bidang) : ''}) hanya bisa diubah ketua atau sekretaris.</p>` : `<div class="form-row">
       <div class="field"><label for="alStatus">Status</label><select class="input" id="alStatus" name="status"><option value="anggota" ${a?.status !== 'pengurus' ? 'selected' : ''}>Anggota</option><option value="pengurus" ${a?.status === 'pengurus' ? 'selected' : ''}>Pengurus</option></select></div>
       <div class="field"><label for="alBidang">Bidang (kalau pengurus)</label><input class="input" id="alBidang" name="bidang" value="${esc(a?.bidang || '')}" placeholder="Usaha, PSDA, PHI…"></div>
-    </div>
+    </div>`}
     <div class="form-row">
       <div class="field"><label for="alAngkatan">Angkatan (opsional)</label><input class="input num" id="alAngkatan" name="angkatan" type="number" min="1990" max="2100" value="${esc(a?.angkatan || '')}"></div>
       <div class="field"><label for="alWa">Nomor WA (opsional)</label><input class="input num" id="alWa" name="wa" inputmode="tel" value="${esc(a?.wa || '')}"></div>
     </div>
-    ${a ? `<label class="chip ${a.aktif === false ? '' : 'on'}" style="width:fit-content"><input type="checkbox" name="aktif" ${a.aktif === false ? '' : 'checked'} data-live="rolechip" style="position:absolute;opacity:0;width:0">Masih aktif sebagai anggota</label>` : ''}
+    ${a && !sendiri ? `<label class="chip ${a.aktif === false ? '' : 'on'}" style="width:fit-content"><input type="checkbox" name="aktif" ${a.aktif === false ? '' : 'checked'} data-live="rolechip" style="position:absolute;opacity:0;width:0">Masih aktif sebagai anggota</label>` : ''}
     <div id="alMsg"></div>
   </form>`, 'sky', `<button class="btn btn-ghost" data-act="close-modal">Batal</button><button class="btn btn-primary" form="anggotaLiveForm" type="submit" id="alSubmit">${a ? 'Simpan perubahan' : 'Tambah anggota'}</button>`);
 }
 
+function viewProfilSayaLive() {
+  const a = Kasir.dataSaya; const ak = Kasir.akun || {};
+  if (!ak.nia) return `${pageHead('Profil saya', 'Hubungkan akunmu dengan NIA supaya data dan poinmu muncul.')}
+    <section class="card c-sky" style="max-width:560px"><form class="form" data-form="hubungkanNia" id="hubungkanForm">
+      <div class="field"><label for="hnNia">NIA kamu</label><input class="input input-lg num" id="hnNia" name="nia" required autocapitalize="characters" placeholder="NIA sesuai kartu anggota"><span class="hint">NIA harus sudah ada di data anggota dan belum dipakai akun lain. Setelah terhubung, NIA tidak bisa diganti sendiri.</span></div>
+      <div id="hnMsg"></div><button class="btn btn-primary" type="submit" id="hnBtn" style="justify-self:start">Hubungkan NIA</button></form></section>`;
+  if (!a) return `${pageHead('Profil saya', '')}${Kasir.anggotaError ? `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir.anggotaError)}</span></div>` : empty('users', 'Data anggotamu belum ditemukan. Hubungi sekretaris.')}`;
+  return `${pageHead('Profil saya', 'Data keanggotaanmu. Kamu bisa memperbarui nama, fakultas, prodi, angkatan, dan nomor WA.', `<button class="btn btn-primary" data-act="anggota-self-form">${ic('edit', 'icon-sm')}Perbarui data</button>`)}
+  <div class="grid grid-2"><section class="card c-sky">
+    <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">${avatar({ id: a.nia, nama: a.nama || '?' }, 56)}<div><h2>${esc(a.nama)}</h2><p class="muted num">NIA ${esc(a.nia)}</p></div></div>
+    <dl class="kv"><dt>Fakultas</dt><dd>${esc(a.fakultas || '-')}</dd><dt>Prodi</dt><dd>${esc(a.prodi || '-')}</dd><dt>Status</dt><dd>${a.status === 'pengurus' ? 'Pengurus' + (a.bidang ? ' · ' + esc(a.bidang) : '') : 'Anggota'}</dd><dt>Angkatan</dt><dd class="num">${esc(a.angkatan || '-')}</dd><dt>WhatsApp</dt><dd class="num">${esc(a.wa || '-')}</dd><dt>Nama pengguna</dt><dd>${esc(ak.username)}</dd></dl>
+  </section></div>`;
+}
+
 function viewAnggota() {
-  if (isLive()) return viewAnggotaLive();
+  if (isLive()) return can.anggotaLiveView() ? viewAnggotaLive() : viewProfilSayaLive();
   if (!can.anggotaView()) return viewProfilSaya();
   const counts = {
     semua: db.profil.length, pengurus: db.profil.filter((p) => p.status === 'pengurus').length,
@@ -660,7 +687,7 @@ function kartuPoinNia(nia, d) {
 function viewPoinKasir() {
   const rate = db.pengaturan.rpPerPoin;
   const data = Kasir.poinPer(rate);
-  const tabs = [['saya', 'Poin saya'], ['cek', 'Cek NIA'], ...(can.poinAll() ? [['semua', 'Semua anggota']] : [])];
+  const tabs = [['saya', 'Poin saya'], ...(Kasir.aksesKasir || !isLive() ? [['cek', 'Cek NIA']] : []), ...(can.poinAll() && (Kasir.aksesKasir || !isLive()) ? [['semua', 'Semua anggota']] : [])];
   if (!tabs.find((t) => t[0] === ui.poinTab)) ui.poinTab = 'saya';
   let body = '';
   if (ui.poinTab === 'saya') {
@@ -794,7 +821,22 @@ function viewFee() {
 }
 
 /* ---------- Akun & peran ---------- */
+const PERAN_HUB = ['ketua', 'sekretaris', 'bendahara', 'bidang_usaha', 'petugas_jaga', 'pengurus'];
+function viewAkunLive() {
+  const q = (ui.q.akunLive || '').toLowerCase();
+  const rows = Kasir.akunList.filter((u) => { const nama = anggotaByNia(u.nia)?.nama || u.nama || ''; return !q || [u.username, nama, u.nia].some((v) => String(v || '').toLowerCase().includes(q)); });
+  const label = { admin: 'Kasir: admin', kasir: 'Kasir: kasir', anggota: 'Anggota', pengurus: 'Pengurus' };
+  return `${pageHead('Akun & peran', 'Atur peran Kopma Hub tiap akun. Role kasir (admin/kasir) tetap diatur admin lewat Firebase.')}
+  ${Kasir.akunError ? `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir.akunError)}</span></div>` : ''}
+  <div class="toolbar"><div class="search">${ic('search')}<input class="input" data-live="akunLive" placeholder="Cari nama pengguna, nama, atau NIA…" value="${esc(ui.q.akunLive || '')}" aria-label="Cari akun"></div></div>
+  <div class="list" id="listAkunLive">${rows.map((u) => { const nama = anggotaByNia(u.nia)?.nama || u.nama || u.username; const saya = u.uid === Kasir.akun?.uid;
+    return `<div class="row">${avatar({ id: u.uid, nama })}<div class="grow"><div class="title">${esc(nama)} ${saya ? '<span class="pill c-sun">Kamu</span>' : ''}</div><div class="sub">${esc(u.username)}${u.nia ? ` · NIA <span class="num">${esc(u.nia)}</span>` : ' · belum terhubung NIA'}</div>
+      <div class="chips" style="margin-top:6px"><span class="pill c-${u.role === 'admin' || u.role === 'kasir' ? 'tangerine' : 'mint'} plain">${esc(label[u.role] || u.role || '-')}</span>${(u.hub || []).filter((r) => ROLES[r]).map((r) => `<span class="pill c-${ROLES[r].color}">${ROLES[r].label}</span>`).join('')}</div></div>
+      ${saya ? '' : `<div class="end"><button class="btn btn-soft btn-sm" data-act="peran-live" data-uid="${esc(u.uid)}">${ic('key', 'icon-sm')}Atur peran</button></div>`}</div>`; }).join('') || empty('users', 'Belum ada akun.')}</div>`;
+}
+
 function viewAkun() {
+  if (isLive()) return viewAkunLive();
   const q = (ui.q.akun || '').toLowerCase();
   const rows = db.profil.filter((p) => !q || p.nama.toLowerCase().includes(q) || p.nia.toLowerCase().includes(q) || p.email.includes(q));
   return `${pageHead('Akun & peran', can.akunEdit() ? 'Buat akun, atur peran, dan serah terima saat ganti periode.' : 'Kamu bisa melihat daftar akun. Perubahan hanya oleh super admin.',
@@ -946,7 +988,7 @@ const ACT = {
     openModal('Akun saya', `<div style="display:flex;gap:12px;align-items:center;margin-bottom:14px">${avatar(p, 52)}<div><b>${esc(p.nama)}</b><div class="small muted">${esc(p.email)}</div><div class="chips" style="margin-top:6px">${rolesOf(meId).map((r) => `<span class="pill c-${ROLES[r].color}">${ROLES[r].label}</span>`).join('')}</div></div></div>
       <div class="list">
         <button class="row click" data-act="theme" style="text-align:left;font:inherit">${ic('moon')}<span class="grow"><b>Mode ${dark ? 'terang' : 'gelap'}</b></span></button>
-        <button class="row click" data-act="reset-demo" style="text-align:left;font:inherit">${ic('refresh')}<span class="grow"><b>Kembalikan data contoh</b><div class="sub">Hapus semua perubahan di browser ini</div></span></button>
+        ${isLive() ? (Kasir.dataSaya ? `<button class="row click" data-act="anggota-self-form" style="text-align:left;font:inherit">${ic('edit')}<span class="grow"><b>Perbarui data saya</b><div class="sub">Nama, fakultas, prodi, angkatan, WA</div></span></button>` : (!Kasir.akun?.nia ? `<a class="row click" href="#anggota" data-act="close-modal" style="text-decoration:none">${ic('user')}<span class="grow"><b>Hubungkan NIA</b><div class="sub">Supaya data dan poinmu muncul</div></span></a>` : '')) : `<button class="row click" data-act="reset-demo" style="text-align:left;font:inherit">${ic('refresh')}<span class="grow"><b>Kembalikan data contoh</b><div class="sub">Hapus semua perubahan di browser ini</div></span></button>`}
         <button class="row click" data-act="logout" style="text-align:left;font:inherit;color:var(--coral-ink)">${ic('logout')}<span class="grow"><b>Keluar</b></span></button>
       </div>`, avColor(p.id));
   },
@@ -957,6 +999,18 @@ const ACT = {
   },
   'reset-demo': () => confirmBox('Kembalikan data contoh?', 'Semua perubahan yang kamu buat di browser ini akan hilang.', 'Ya, kembalikan', () => { db = Store.reset(); save(); closeModal(); render(); toast('Data contoh dikembalikan', 'sky'); }),
   logout: async () => { const live = isLive(); meId = null; Store.setPref('me', ''); closeModal(); location.hash = ''; ui.loginError = ''; if (live) await Kasir.disconnect(); render(); },
+  'daftar-buka': () => { ui.daftar = true; ui.loginError = ''; render(); $('#dfKode')?.focus(); },
+  'daftar-tutup': () => { ui.daftar = false; render(); },
+  'anggota-self-form': () => { const a = Kasir.dataSaya; if (a) formAnggotaLive(a, true); },
+  'peran-live': (el) => {
+    const u = Kasir.akunList.find((x) => x.uid === el.dataset.uid); if (!u) return;
+    const nama = anggotaByNia(u.nia)?.nama || u.nama || u.username;
+    openModal('Atur peran', `<form class="form" data-form="peranLive" id="peranLiveForm"><input type="hidden" name="uid" value="${esc(u.uid)}">
+      <p class="muted">${esc(nama)} (${esc(u.username)}). Boleh lebih dari satu peran.</p>
+      <div class="chips">${PERAN_HUB.map((k) => `<label class="chip c-${ROLES[k].color} ${(u.hub || []).includes(k) ? 'on' : ''}"><input type="checkbox" name="peran" value="${k}" ${(u.hub || []).includes(k) ? 'checked' : ''} data-live="rolechip" style="position:absolute;opacity:0;width:0">${ROLES[k].label}</label>`).join('')}</div>
+      <p class="small muted">Ketua & sekretaris: kelola anggota dan peran. Bendahara: lihat data anggota. Tanpa peran: anggota biasa.</p><div id="plMsg"></div></form>`, 'mint',
+      `<button class="btn btn-ghost" data-act="close-modal">Batal</button><button class="btn btn-primary" form="peranLiveForm" type="submit" id="plBtn">Simpan peran</button>`);
+  },
   'anggota-live-filter': (el) => { ui.anggotaLiveFilter = el.dataset.k; render(); },
   'anggota-live-form': (el) => formAnggotaLive(el.dataset.nia ? Kasir.anggota.find((a) => a.nia === el.dataset.nia) : null),
   'anggota-live': (el) => {
@@ -1148,6 +1202,7 @@ const LIVE = {
     previewPoin();
   },
   nominal: () => { startTimer(); previewPoin(); },
+  akunLive: (el) => { ui.q.akunLive = el.value; const v = el.value; render(); const i = document.querySelector('[data-live="akunLive"]'); if (i) { i.focus(); i.setSelectionRange(v.length, v.length); } },
   anggotaLive: (el) => { ui.q.anggotaLive = el.value; $('#listAnggotaLive').innerHTML = listAnggotaLive(); },
   ceknia: (el) => { ui.q.ceknia = el.value; $('#cekHasil').innerHTML = hasilCekNia(); },
   opname: () => {
@@ -1173,8 +1228,38 @@ const FORM = {
     if (Kasir.status === 'error') { btn.disabled = false; btn.textContent = 'Masuk'; $('#loginMsg').innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir.error)}</span></div>`; return; }
     meId = LIVE_ID; Store.setPref('me', LIVE_ID); location.hash = 'dasbor'; render();
   },
+  daftar: async (f) => {
+    const msg = $('#daftarMsg'); const err = (t) => { msg.innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(t)}</span></div>`; };
+    const nia = normNia(f.nia.value); const user = f.user.value.trim();
+    if (!/^[A-Z0-9.\-\/]{3,20}$/.test(nia)) return err('NIA hanya boleh huruf, angka, titik, strip, atau garis miring (3-20 karakter).');
+    if (!/^[A-Za-z0-9._\-]{3,30}$/.test(user)) return err('Nama pengguna 3-30 karakter: huruf, angka, titik, strip, atau garis bawah, tanpa spasi.');
+    if (f.pass.value !== f.pass2.value) return err('Kedua kata sandi tidak sama.');
+    const btn = $('#daftarBtn'); btn.disabled = true; btn.textContent = 'Mendaftarkan…';
+    await Kasir.daftar({ kode: f.kode.value, nia, username: user, pass: f.pass.value });
+    if (Kasir.status === 'error') { btn.disabled = false; btn.textContent = 'Daftar'; return err(Kasir.error); }
+    ui.daftar = false; meId = LIVE_ID; Store.setPref('me', LIVE_ID); location.hash = 'dasbor'; render(); toast('Akun berhasil dibuat. Selamat datang!', 'grape');
+  },
+  hubungkanNia: async (f) => {
+    const nia = normNia(f.nia.value); const btn = $('#hnBtn'); const msg = $('#hnMsg');
+    if (!/^[A-Z0-9.\-\/]{3,20}$/.test(nia)) { msg.innerHTML = `<div class="notice c-coral">${ic('alert')}<span>Format NIA tidak sesuai.</span></div>`; return; }
+    btn.disabled = true; btn.textContent = 'Menghubungkan…';
+    try { await Kasir.hubungkanNia(nia); toast('NIA terhubung', 'sky'); render(); }
+    catch (e) { btn.disabled = false; btn.textContent = 'Hubungkan NIA'; msg.innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir._pesan(e))}</span></div>`; }
+  },
+  peranLive: async (f) => {
+    const hub = [...f.querySelectorAll('[name=peran]:checked')].map((i) => i.value); const btn = $('#plBtn'); btn.disabled = true; btn.textContent = 'Menyimpan…';
+    try { await Kasir.ubahPeran(f.uid.value, hub); closeModal(); toast('Peran diperbarui', 'mint'); render(); }
+    catch (e) { btn.disabled = false; btn.textContent = 'Simpan peran'; $('#plMsg').innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir._pesan(e))}</span></div>`; }
+  },
   anggotaLive: async (f) => {
     const baru = f.baru.value === '1';
+    if (f.sendiri.value === '1') {
+      const data = { nia: normNia(f.nia.value), nama: f.nama.value.trim().replace(/\s+/g, ' '), fakultas: f.fakultas.value.trim(), prodi: f.prodi.value.trim(), angkatan: f.angkatan.value ? Number(f.angkatan.value) : null, wa: f.wa.value.trim() || null };
+      const btn = $('#alSubmit'); btn.disabled = true; btn.textContent = 'Menyimpan…';
+      try { await Kasir.simpanAnggota(data, false); closeModal(); toast('Datamu diperbarui', 'sky'); render(); }
+      catch (e) { btn.disabled = false; btn.textContent = 'Simpan perubahan'; $('#alMsg').innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir._pesan(e))}</span></div>`; }
+      return;
+    }
     const data = { nama: f.nama.value.trim().replace(/\s+/g, ' '), nia: normNia(f.nia.value), fakultas: f.fakultas.value.trim(), prodi: f.prodi.value.trim(), status: f.status.value, bidang: f.bidang.value.trim() || null, angkatan: f.angkatan.value ? Number(f.angkatan.value) : null, wa: f.wa.value.trim() || null };
     if (!baru) data.aktif = !!f.aktif?.checked;
     const msg = $('#alMsg'); const err = (t) => { msg.innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(t)}</span></div>`; };
@@ -1300,7 +1385,7 @@ window.addEventListener('hashchange', () => { closeModal(); render(); window.scr
   if (meId === '') meId = null;
   Kasir.onChange = () => {
     if (isLive() && !Kasir.on) { if (!$('#loginForm')) render(); return; }
-    if (!me() || !['stok', 'dasbor', 'poin', 'anggota'].includes(ui.view) || $('#modalBack')) return;
+    if (!me() || !['stok', 'dasbor', 'poin', 'anggota', 'akun'].includes(ui.view) || $('#modalBack')) return;
     const a = document.activeElement;
     if (a && a.matches('input, select, textarea') && $('#main')?.contains(a)) { if ($('#listStok')) $('#listStok').innerHTML = listStok(); if ($('#listAnggotaLive')) $('#listAnggotaLive').innerHTML = listAnggotaLive(); return; }
     render();

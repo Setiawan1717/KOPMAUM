@@ -4,7 +4,7 @@ rules_version = '2';
 // Disusun dari semua operasi baca/tulis yang ada di web kasir (KasirKopmaUM2026/index.html):
 //  - role "kasir": jualan (kurangi stok produk + buat transaksi)
 //  - role "admin": semua menu kasir (produk, barang masuk, riwayat, laporan, pengeluaran, modal harian)
-//  - Kopma Hub: membaca data kasir; ketua & sekretaris mengelola koleksi anggota
+//  - Kopma Hub: membaca data kasir; ketua & sekretaris mengelola anggota dan peran; anggota mendaftar dengan kode
 // Semua yang tidak disebut di bawah otomatis DITOLAK.
 
 service cloud.firestore {
@@ -17,20 +17,69 @@ service cloud.firestore {
     function petugas() { return terdaftar() && akun().role in ['admin', 'kasir']; }
     // peran di Kopma Hub disimpan di field "hub" (daftar) pada dokumen users, contoh: ["ketua"]
     function punyaHub(daftar) { return terdaftar() && akun().get('hub', []).hasAny(daftar); }
+    function niaSaya() { return terdaftar() ? akun().get('nia', '') : ''; }
+    function berubahHanya(kolom) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(kolom); }
+    // NIA yang diklaim akun ini dalam penulisan yang sama (batch) harus milik akun ini
+    function klaimMilikku(nia) { return getAfter(/databases/$(database)/documents/klaim_nia/$(nia)).data.uid == request.auth.uid; }
+    function bisaKlaim(nia) { return nia is string && nia.size() >= 3 && exists(/databases/$(database)/documents/anggota/$(nia)) && klaimMilikku(nia); }
+    function perananHub() { return ['ketua', 'sekretaris', 'bendahara', 'bidang_usaha', 'petugas_jaga', 'pengurus']; }
 
     // ---------- Akun ----------
-    // Akun baru TIDAK bisa mendaftarkan dirinya sendiri (apalagi sebagai admin).
-    // Akun dibuat pemilik lewat Firebase Console; lihat firebase/README.md.
+    // Pendaftaran mandiri (lewat Kopma Hub) hanya sah kalau: kode pendaftaran benar (dicek di server,
+    // kodenya disimpan di pengaturan/pendaftaran yang tidak bisa dibaca siapa pun), NIA sudah ada di
+    // data anggota, dan NIA itu belum diklaim akun lain. Akun baru selalu ber-role "anggota" tanpa peran hub.
     match /users/{uid} {
-      allow read: if masuk() && (request.auth.uid == uid || admin());
-      allow update, delete: if admin();
-      allow create: if admin();
+      allow read: if masuk() && (request.auth.uid == uid || admin() || punyaHub(['ketua', 'sekretaris']));
+      allow create: if admin()
+        || (masuk() && request.auth.uid == uid
+            && request.resource.data.keys().hasOnly(['username', 'role', 'nia', 'dibuat'])
+            && request.resource.data.role == 'anggota'
+            && request.auth.token.email == request.resource.data.username + '@kopma.um'
+            && existsAfter(/databases/$(database)/documents/bukti_daftar/$(uid))
+            && bisaKlaim(request.resource.data.nia));
+      allow update: if admin()
+        // ketua/sekretaris mengatur peran Kopma Hub orang lain (bukan dirinya sendiri, bukan role kasir)
+        || (punyaHub(['ketua', 'sekretaris']) && request.auth.uid != uid
+            && berubahHanya(['hub'])
+            && request.resource.data.hub is list && request.resource.data.hub.hasOnly(perananHub()))
+        // akun lama (tanpa NIA) menghubungkan NIA-nya sendiri
+        || (request.auth.uid == uid && resource.data.get('nia', '') == ''
+            && berubahHanya(['nia']) && bisaKlaim(request.resource.data.nia));
+      allow delete: if admin();
+    }
+
+    // Satu NIA hanya untuk satu akun. Dibuat bersamaan dengan pendaftaran / penghubungan NIA.
+    match /klaim_nia/{nia} {
+      allow read: if admin() || punyaHub(['ketua', 'sekretaris']);
+      allow create: if masuk()
+        && request.resource.data.keys().hasOnly(['uid', 'dibuat'])
+        && request.resource.data.uid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.nia == nia;
+      allow update: if false;
+      allow delete: if admin();         // admin bisa melepas klaim yang salah
+    }
+
+    // Bukti kode pendaftaran benar. Kodenya dicocokkan di server; tidak ada yang bisa membaca dokumen ini.
+    match /bukti_daftar/{uid} {
+      allow create: if masuk() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['kode'])
+        && request.resource.data.kode == get(/databases/$(database)/documents/pengaturan/pendaftaran).data.kode;
+      allow read, update, delete: if false;
+    }
+
+    // Pengaturan rahasia (kode pendaftaran). Hanya diubah lewat Firebase Console.
+    match /pengaturan/{id} {
+      allow read, write: if false;
     }
 
     // ---------- Data anggota (Kopma Hub) ----------
     // ID dokumen = NIA, jadi satu NIA tidak bisa terdaftar dua kali. Data tidak pernah dihapus.
     match /anggota/{nia} {
-      allow read: if punyaHub(['ketua', 'sekretaris', 'bendahara']) || admin();
+      allow read: if punyaHub(['ketua', 'sekretaris', 'bendahara']) || admin() || (niaSaya() != '' && niaSaya() == nia);
+      // pemilik NIA memperbarui datanya sendiri (bukan status, bidang, atau NIA)
+      allow update: if niaSaya() != '' && niaSaya() == nia
+        && berubahHanya(['nama', 'fakultas', 'prodi', 'angkatan', 'wa', 'diubah', 'diubahOleh'])
+        && request.resource.data.nama is string && request.resource.data.nama.size() >= 2;
       allow create, update: if punyaHub(['ketua', 'sekretaris'])
         && request.resource.data.nia == nia
         && request.resource.data.keys().hasOnly(['nia', 'nama', 'fakultas', 'prodi', 'angkatan', 'wa', 'status', 'bidang', 'aktif', 'dibuat', 'dibuatOleh', 'diubah', 'diubahOleh'])
@@ -53,7 +102,8 @@ service cloud.firestore {
 
     // ---------- Transaksi ----------
     match /transactions/{id} {
-      allow read: if petugas();
+      // anggota hanya bisa membaca transaksi dengan NIA miliknya sendiri (untuk poin)
+      allow read: if petugas() || (niaSaya() != '' && resource.data.get('niaAnggota', '') == niaSaya());
       allow create: if petugas()
         && request.resource.data.total is number
         && request.resource.data.item is list;
