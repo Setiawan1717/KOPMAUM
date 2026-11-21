@@ -29,6 +29,17 @@ Ini **mode demo**: data contoh disimpan di browser (localStorage). Perubahan han
 
 Tambahan: halaman **Jejak** (siapa mengubah apa), **ekspor CSV** untuk PHI, mode gelap.
 
+## Sambungan ke web kasir
+
+Modul Stok bisa membaca data langsung dari web kasir (repo `KasirKopmaUM2026`, Firebase project `kopma-um`).
+
+- Buka **Stok Mart**, lalu masuk dengan akun yang dipakai di web kasir (hanya peran bidang usaha, PHI, atau super admin yang melihat form ini).
+- **Baca saja:** `js/kasir.js` hanya memakai `onSnapshot` dan `getDocs`. Tidak ada fungsi tulis Firestore, jadi data kasir tidak bisa berubah dari Kopma Hub.
+- Setelah tersambung, stok, daftar perlu belanja, riwayat penjualan dan barang masuk, serta penjualan hari ini diambil dari kasir secara langsung. Pencatatan stok dan opname di Kopma Hub dimatikan karena tugas itu dikerjakan di kasir.
+- **Batas minimum** tiap produk disimpan di Kopma Hub (browser), tidak ditulis ke data produk kasir.
+- Tombol **Cadangkan data kasir** mengunduh semua produk, transaksi, pengeluaran, dan modal harian sebagai file JSON.
+- Fitur ini tidak jalan di pratinjau claude.ai karena pratinjau memblokir koneksi ke Firebase. Buka dari hosting (Netlify/Vercel/GitHub Pages) atau dari file lokal.
+
 ## Struktur
 
 ```
@@ -36,6 +47,7 @@ index.html          halaman utama
 css/style.css       tampilan (palet 8 warna, satu warna per modul)
 js/data.js          data contoh + penyimpanan demo
 js/app.js           tampilan, hak akses, dan logika semua modul
+js/kasir.js         sambungan baca-saja ke Firebase web kasir
 supabase/schema.sql 9 tabel, aturan RLS, trigger cek booking, view jadwal_sewa_publik
 ```
 

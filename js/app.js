@@ -119,7 +119,9 @@ const NEXT_LABEL = { Dikonfirmasi: 'Konfirmasi', Diambil: 'Tandai diambil', Sele
 
 /* ================= Logika lain ================= */
 const saldoPoin = (id) => db.poin.filter((p) => p.userId === id).reduce((a, p) => a + p.poin, 0);
-const perluBelanja = () => db.barangMart.filter((b) => b.stok < b.min);
+const martItems = () => (Kasir.on ? Kasir.barang() : db.barangMart);
+const perluBelanja = () => martItems().filter((b) => b.stok < b.min);
+const stokBisaDiubah = () => can.stokEdit() && !Kasir.on;
 const simpananOf = (id) => db.simpanan.filter((s) => s.userId === id);
 const simpananLunas = (id) => simpananOf(id).every((s) => s.lunas);
 const feeOf = (id) => db.fee.filter((f) => f.userId === id).sort((a, b) => b.tanggal.localeCompare(a.tanggal));
@@ -246,6 +248,7 @@ function viewDasbor() {
     const aktif = db.booking.filter((b) => AKTIF.includes(b.status)).length;
     tiles.push(`<a href="#rental" class="tile c-tangerine"><span class="t-icon">${ic('cal')}</span><span class="t-val num">${aktif}</span><span class="t-lbl">Booking aktif</span></a>`);
   }
+  if (can.stokView() && Kasir.on) { const h = Kasir.penjualanHari(TODAY); tiles.push(`<a href="#stok" class="tile c-mint"><span class="t-icon">${ic('cart')}</span><span class="t-val num">${rp(h.total)}</span><span class="t-lbl">Penjualan hari ini · ${h.n} transaksi</span></a>`); }
   if (can.stokView()) tiles.push(`<a href="#stok" class="tile c-lime" data-act="go-belanja"><span class="t-icon">${ic('cart')}</span><span class="t-val num">${perluBelanja().length}</span><span class="t-lbl">Barang perlu belanja</span></a>`);
   if (can.anggotaFull()) tiles.push(`<a href="#anggota" class="tile c-sky"><span class="t-icon">${ic('users')}</span><span class="t-val num">${db.profil.filter((x) => x.aktif).length}</span><span class="t-lbl">Anggota terdaftar</span></a>`);
   if (!can.rentalView()) tiles.push(`<a href="#anggota" class="tile c-mint"><span class="t-icon">${ic('check')}</span><span class="t-val">${simpananLunas(meId) ? 'Lunas' : 'Belum'}</span><span class="t-lbl">Status simpananmu</span></a>`);
@@ -256,7 +259,7 @@ function viewDasbor() {
   const quick = [];
   if (can.poinAdd()) quick.push(`<a class="btn btn-primary c-grape" href="#poin" data-act="go-catat">${ic('star', 'icon-sm')}Catat belanja anggota</a>`);
   if (can.rentalEdit()) quick.push(`<button class="btn btn-primary c-tangerine" data-act="booking-baru">${ic('plus', 'icon-sm')}Booking baru</button>`);
-  if (can.stokEdit()) quick.push(`<button class="btn btn-primary c-lime" data-act="mutasi" data-id="">${ic('box', 'icon-sm')}Catat stok</button>`);
+  if (stokBisaDiubah()) quick.push(`<button class="btn btn-primary c-lime" data-act="mutasi" data-id="">${ic('box', 'icon-sm')}Catat stok</button>`);
   if (can.feeEdit()) quick.push(`<button class="btn btn-primary c-pink" data-act="fee-baru">${ic('wallet', 'icon-sm')}Catat fee</button>`);
 
   const dampingan = db.profil.filter((x) => x.pendampingId === meId);
@@ -373,18 +376,19 @@ function profilDetail(p) {
 function stokRow(b) {
   const low = b.stok < b.min;
   const pct = Math.min(100, Math.round((b.stok / Math.max(b.min * 2, 1)) * 100));
-  return `<div class="row ${can.stokEdit() ? 'click' : ''}" ${can.stokEdit() ? `data-act="mutasi" data-id="${b.id}" role="button" tabindex="0"` : ''}>
+  return `<div class="row ${stokBisaDiubah() ? 'click' : ''}" ${stokBisaDiubah() ? `data-act="mutasi" data-id="${b.id}" role="button" tabindex="0"` : ''}>
     <div class="grow">
       <div class="title">${esc(b.nama)}</div>
-      <div class="sub">${esc(b.kategori)} · jual ${rp(b.hargaJual)}</div>
+      <div class="sub">${esc(b.kategori)} · jual ${rp(b.hargaJual)}${b.barcode ? ` · <span class="num">${esc(b.barcode)}</span>` : ''}</div>
       <div class="meter c-${low ? 'coral' : b.stok < b.min * 1.5 ? 'sun' : 'lime'}" style="margin-top:6px"><i style="width:${pct}%"></i></div>
     </div>
-    <div class="end"><b class="num" style="font-size:1.15rem">${b.stok}</b><span class="small muted num">min ${b.min}</span>${low ? '<span class="pill c-coral">Perlu belanja</span>' : ''}</div>
+    <div class="end"><b class="num" style="font-size:1.15rem">${b.stok}</b>${Kasir.on && can.stokEdit() ? `<button class="btn btn-ghost btn-sm num" data-act="set-min" data-id="${esc(b.id)}" title="Ubah batas minimum">min ${b.min}</button>` : `<span class="small muted num">min ${b.min}</span>`}${low ? '<span class="pill c-coral">Perlu belanja</span>' : ''}</div>
   </div>`;
 }
 function viewStok() {
-  const tabs = [['barang', 'Barang'], ['belanja', `Perlu belanja (${perluBelanja().length})`], ['riwayat', 'Riwayat'], ...(can.stokEdit() ? [['opname', 'Stock opname']] : [])];
-  const kats = ['Semua', ...new Set(db.barangMart.map((b) => b.kategori))];
+  const tabs = [['barang', 'Barang'], ['belanja', `Perlu belanja (${perluBelanja().length})`], ['riwayat', 'Riwayat'], ...(stokBisaDiubah() ? [['opname', 'Stock opname']] : [])];
+  if (!tabs.find((t) => t[0] === ui.stokTab)) ui.stokTab = 'barang';
+  const kats = ['Semua', ...new Set(martItems().map((b) => b.kategori))];
   let body = '';
   if (ui.stokTab === 'barang') {
     body = `<div class="toolbar"><div class="search">${ic('search')}<input class="input" data-live="stok" placeholder="Cari barang…" value="${esc(ui.q.stok || '')}" aria-label="Cari barang"></div></div>
@@ -397,6 +401,12 @@ function viewStok() {
       <div class="table-wrap"><table><thead><tr><th>Barang</th><th class="r">Stok</th><th class="r">Min</th><th class="r">Saran beli</th><th class="r">Perkiraan</th></tr></thead><tbody>
       ${items.map((b) => `<tr><td><b>${esc(b.nama)}</b></td><td class="r num">${b.stok}</td><td class="r num">${b.min}</td><td class="r num"><b>${b.min * 2 - b.stok}</b></td><td class="r num">${rp((b.min * 2 - b.stok) * b.hargaBeli)}</td></tr>`).join('')}
       </tbody></table></div>` : empty('check', 'Semua stok aman di atas batas minimum.', 'mint');
+  } else if (ui.stokTab === 'riwayat' && Kasir.on) {
+    const rows = Kasir.riwayat().slice(0, 120);
+    body = rows.length ? `<div class="list">${rows.map((m) => {
+      const c = m.jenis === 'masuk' ? 'lime' : 'tangerine';
+      return `<div class="row"><span class="stripe c-${c}"></span><div class="grow"><div class="title">${esc(m.nama)}</div><div class="sub">${esc(m.alasan)} · ${esc(m.oleh)} · ${waktu(m.waktu)}</div></div><div class="end"><b class="num c-${c}" style="color:var(--c-ink)">${m.jenis === 'masuk' ? '+' : '−'}${m.jumlah}</b><span class="pill c-${c}">${m.jenis}</span></div></div>`;
+    }).join('')}</div>` : empty('history', 'Belum ada penjualan atau barang masuk di kasir.');
   } else if (ui.stokTab === 'riwayat') {
     const rows = [...db.mutasi].sort((a, b) => b.waktu.localeCompare(a.waktu));
     body = `<div class="list">${rows.map((m) => {
@@ -415,14 +425,33 @@ function viewStok() {
     </form>`;
   }
   return `
-  ${pageHead('Stok Kopma Mart', can.stokEdit() ? 'Ketuk barang untuk mencatat barang masuk atau keluar.' : 'Kamu bisa melihat stok. Perubahan hanya oleh bidang usaha.',
-    `${exportBtn('stok')}${can.stokEdit() ? `<button class="btn btn-ghost" data-act="barang-form">${ic('plus', 'icon-sm')}Barang baru</button><button class="btn btn-primary" data-act="mutasi" data-id="">${ic('box', 'icon-sm')}Catat mutasi</button>` : ''}`)}
+  ${pageHead('Stok Kopma Mart', Kasir.on ? 'Stok terkini langsung dari web kasir. Penjualan dan barang masuk dicatat di kasir.' : can.stokEdit() ? 'Ketuk barang untuk mencatat barang masuk atau keluar.' : 'Kamu bisa melihat stok. Perubahan hanya oleh bidang usaha.',
+    `${exportBtn('stok')}${stokBisaDiubah() ? `<button class="btn btn-ghost" data-act="barang-form">${ic('plus', 'icon-sm')}Barang baru</button><button class="btn btn-primary" data-act="mutasi" data-id="">${ic('box', 'icon-sm')}Catat mutasi</button>` : ''}`)}
+  ${kasirPanel()}
   <div class="seg">${tabs.map(([k, l]) => `<button class="${ui.stokTab === k ? 'on' : ''}" data-act="stok-tab" data-k="${k}">${l}</button>`).join('')}</div>
   ${body}`;
 }
+function kasirPanel() {
+  const bisaAtur = can.stokEdit() || isPHI() || has('super_admin');
+  if (Kasir.status === 'on') {
+    const h = Kasir.penjualanHari(TODAY);
+    return `<section class="card c-mint"><div class="card-head" style="margin:0"><div style="display:grid;gap:2px"><span class="pill" style="width:fit-content">Tersambung ke web kasir · baca saja</span><span class="small muted">${esc(Kasir.email)} · ${Kasir.products.length} produk · hari ini ${h.n} transaksi (${rp(h.total)})</span></div>
+      ${bisaAtur ? `<div class="actions"><button class="btn btn-soft btn-sm" data-act="kasir-backup">${ic('download', 'icon-sm')}Cadangkan data kasir</button><button class="btn btn-ghost btn-sm" data-act="kasir-putus">Putuskan</button></div>` : ''}</div></section>`;
+  }
+  if (Kasir.status === 'connecting') return `<section class="card c-mint"><span class="pill">Menyambungkan ke web kasir…</span></section>`;
+  const err = Kasir.status === 'error' ? `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir.error)}</span></div>` : '';
+  if (!bisaAtur) return `<div class="notice c-sun">${ic('alert')}<span>Belum tersambung ke web kasir. Yang tampil di bawah adalah data contoh.</span></div>`;
+  return `<section class="card c-mint">
+    <form class="form" data-form="kasir" id="kasirForm">
+      <div style="display:grid;gap:4px"><h3>Sambungkan ke web kasir</h3><p class="small muted">Masuk dengan akun yang dipakai di web kasir. Kopma Hub hanya <b>membaca</b> produk, penjualan, dan barang masuk. Data di kasir tidak bisa berubah dari sini. Selama belum tersambung, stok di bawah adalah data contoh.</p></div>
+      <div class="form-row"><div class="field"><label for="ksEmail">Email akun kasir</label><input class="input" id="ksEmail" name="email" type="email" autocomplete="username" required></div><div class="field"><label for="ksPass">Kata sandi</label><input class="input" id="ksPass" name="pass" type="password" autocomplete="current-password" required></div></div>
+      ${err}
+      <button class="btn btn-primary" type="submit" style="justify-self:start">Sambungkan (baca saja)</button>
+    </form></section>`;
+}
 function listStok() {
   const q = (ui.q.stok || '').toLowerCase();
-  const rows = db.barangMart.filter((b) => (ui.stokKat === 'Semua' || b.kategori === ui.stokKat) && (!q || b.nama.toLowerCase().includes(q)));
+  const rows = martItems().filter((b) => (ui.stokKat === 'Semua' || b.kategori === ui.stokKat) && (!q || b.nama.toLowerCase().includes(q)));
   return rows.length ? rows.map(stokRow).join('') : empty('search', 'Barang tidak ditemukan.');
 }
 
@@ -908,13 +937,30 @@ const ACT = {
       commit(`${n} peran pengurus dicabut. Atur peran pengurus baru lewat tombol Peran.`, 'grape', 'akun', `Menutup periode ${PERIODE}: ${n} peran pengurus dicabut`);
     });
   },
+  'set-min': (el) => {
+    const b = martItems().find((x) => x.id === el.dataset.id);
+    openModal('Batas minimum', `<form class="form" data-form="setmin" id="minForm"><input type="hidden" name="id" value="${esc(b.id)}"><p class="muted">${esc(b.nama)} · stok sekarang <b class="num">${b.stok}</b>. Di bawah angka ini, barang masuk daftar perlu belanja. Disimpan di Kopma Hub, data kasir tidak berubah.</p><div class="field"><label for="minVal">Batas minimum</label><input class="input input-lg num" id="minVal" name="min" type="number" min="0" value="${b.min}" required></div></form>`, 'lime', `<button class="btn btn-ghost" data-act="close-modal">Batal</button><button class="btn btn-primary" form="minForm" type="submit">Simpan</button>`);
+  },
+  'kasir-putus': () => confirmBox('Putuskan dari web kasir?', 'Kopma Hub akan kembali menampilkan data contoh. Data di kasir tidak terpengaruh.', 'Putuskan', async () => { closeModal(); await Kasir.disconnect(); toast('Sambungan ke kasir diputus', 'sky'); }),
+  'kasir-backup': async (el) => {
+    el.disabled = true; el.textContent = 'Mengambil data…';
+    try {
+      const data = await Kasir.backup();
+      const json = JSON.stringify(data, null, 1);
+      const n = Object.entries(data.koleksi).map(([k, v]) => `${k}: ${v.length}`).join(' · ');
+      catat('stok', `Cadangan data kasir diunduh (${n})`); save();
+      const blob = new Blob([json], { type: 'application/json' }); const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = `cadangan-kasir-${TODAY}.json`; document.body.appendChild(a); a.click(); a.remove();
+      render(); toast(`Cadangan diunduh · ${n}`, 'mint');
+    } catch (e) { render(); toast(Kasir._pesan(e), 'coral'); }
+  },
   'jejak-mod': (el) => { ui.jejakModul = el.dataset.k; render(); },
 
   export: (el) => {
     const k = el.dataset.kind;
     const T = {
       anggota: [['Nama', 'NIM', 'Prodi', 'Angkatan', 'WA', 'Status', 'Bidang', 'Pendamping', 'Simpanan lunas'], db.profil.map((p) => [p.nama, p.nim, p.prodi, p.angkatan, p.wa, p.status, p.bidang || '', p.pendampingId ? prof(p.pendampingId).nama : '', simpananLunas(p.id) ? 'Ya' : 'Belum'])],
-      stok: [['Barang', 'Kategori', 'Harga beli', 'Harga jual', 'Stok', 'Minimum'], db.barangMart.map((b) => [b.nama, b.kategori, b.hargaBeli, b.hargaJual, b.stok, b.min])],
+      stok: [['Barang', 'Kategori', 'Harga beli', 'Harga jual', 'Stok', 'Minimum'], martItems().map((b) => [b.nama, b.kategori, b.hargaBeli, b.hargaJual, b.stok, b.min])],
       booking: [['Penyewa', 'WA', 'Barang', 'Unit', 'Ambil', 'Kembali', 'Total', 'Status'], db.booking.map((b) => [b.penyewa, b.wa, db.barangSewa.find((x) => x.id === b.barangId).nama, b.unit, b.ambil, b.kembali, b.total, b.status])],
       poin: [['Anggota', 'NIM', 'Belanja', 'Poin', 'Alasan', 'Pencatat', 'Waktu'], db.poin.map((x) => [prof(x.userId).nama, prof(x.userId).nim, x.belanja, x.poin, x.alasan, prof(x.olehId).nama, x.waktu])],
       fee: [['Penerima', 'Jenis', 'Kegiatan', 'Nominal', 'Tanggal', 'Dibayar'], db.fee.map((f) => [prof(f.userId).nama, f.jenis, f.kegiatan, f.nominal, f.tanggal, f.lunas ? 'Ya' : 'Belum'])],
@@ -1031,6 +1077,8 @@ const FORM = {
     db.poin.push({ id: uid('p'), userId: f.userId.value, belanja: 0, poin: n, alasan: 'Koreksi: ' + f.alasan.value.trim(), olehId: meId, waktu: nowIso() });
     commit('Koreksi poin tersimpan', 'sun', 'poin', `Koreksi poin ${prof(f.userId.value).nama} ${n > 0 ? '+' : ''}${n}: ${f.alasan.value.trim()}`);
   },
+  kasir: async (f) => { await Kasir.connect(f.email.value.trim(), f.pass.value); if (Kasir.status === 'on' || Kasir.status === 'connecting') catat('stok', 'Menyambungkan Kopma Hub ke data web kasir (baca saja)'); save(); },
+  setmin: (f) => { const v = Math.max(0, parseInt(f.min.value, 10) || 0); Store.setPref(Kasir.minKey(f.id.value), String(v)); const b = martItems().find((x) => x.id === f.id.value); commit(`Batas minimum ${esc(b.nama)}: ${v}`, 'lime', 'stok', `Batas minimum ${b.nama} → ${v}`); },
   rumus: (f) => { const v = parseInt(f.rate.value, 10); if (!v) return; const lama = db.pengaturan.rpPerPoin; db.pengaturan.rpPerPoin = v; commit(`Rumus baru: ${rp(v)} = 1 poin`, 'sun', 'poin', `Ubah rumus poin ${rp(lama)} → ${rp(v)} per poin`); },
   fee: (f) => {
     const x = { id: uid('f'), userId: f.userId.value, jenis: f.jenis.value, kegiatan: f.kegiatan.value.trim(), nominal: +f.nominal.value, tanggal: f.tanggal.value, lunas: f.lunas.value === '1', olehId: meId };
@@ -1089,5 +1137,12 @@ window.addEventListener('hashchange', () => { closeModal(); render(); window.scr
 (() => {
   const t = Store.getPref('theme', ''); if (t) document.documentElement.dataset.theme = t;
   if (meId === '') meId = null;
+  Kasir.onChange = () => {
+    if (!me() || !['stok', 'dasbor'].includes(ui.view) || $('#modalBack')) return;
+    const a = document.activeElement;
+    if (a && a.matches('input, select, textarea') && $('#main')?.contains(a)) { if ($('#listStok')) $('#listStok').innerHTML = listStok(); return; }
+    render();
+  };
   render();
+  Kasir.resume();
 })();
