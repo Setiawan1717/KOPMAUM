@@ -362,3 +362,7 @@ textarea.csv { width: 100%; min-height: 220px; font-family: ui-monospace, 'SF Mo
   .tiles > .tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .tile .t-val { font-size: 1.45rem; }
 }
+
+.demo-box { border-top: 1px solid var(--line); padding-top: 14px; }
+.demo-box summary { cursor: pointer; font-size: .86rem; font-weight: 600; color: var(--muted); width: fit-content; }
+.demo-box summary:hover { color: var(--text); }

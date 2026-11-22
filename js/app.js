@@ -262,13 +262,13 @@ function viewLogin() {
             <button class="btn btn-primary" type="submit" id="daftarBtn">Daftar</button>
           </form>` : `<div class="card-head" style="margin:0"><div><b>Belum punya akun?</b><p class="small muted">Daftar sendiri dengan kode pendaftaran dari pengurus.</p></div><button type="button" class="btn btn-soft" data-act="daftar-buka">Daftar</button></div>`}
         </section>
-        <div class="divider"></div>
-        <div style="display:grid;gap:10px">
-          <div><b>Coba mode demo</b><p class="small muted">Pakai data contoh, tidak tersambung ke data asli. Tiap peran melihat menu yang berbeda.</p></div>
+        <details class="demo-box">
+          <summary>Lihat mode demo (data contoh, bukan data asli)</summary>
+          <p class="small muted" style="margin:8px 0 10px">Untuk mencoba tampilan tiap peran. Tidak tersambung ke Firebase dan tidak menyimpan apa pun ke data asli.</p>
           <div class="demo-accounts">
-            ${demo.map(([id, r]) => { const p = prof(id); return `<button type="button" class="demo-acc c-${ROLES[r].color}" data-act="demo-login" data-id="${id}"><span class="avatar" style="width:36px;height:36px;background:var(--c);color:#fff">${esc(inisial(p.nama))}</span><span><b>${esc(ROLES[r].label)}</b><span>${esc(p.nama)}</span></span></button>`; }).join('')}
+            ${demo.map(([id, r]) => { const p = prof(id); return `<button type="button" class="demo-acc c-${ROLES[r].color}" data-act="demo-login" data-id="${id}"><span class="avatar c-${ROLES[r].color}" style="width:36px;height:36px;background:var(--c);color:#fff">${esc(inisial(p.nama))}</span><span><b>${esc(ROLES[r].label)}</b><span>${esc(p.nama)} · demo</span></span></button>`; }).join('')}
           </div>
-        </div>
+        </details>
       </div>
     </section>
   </div>`;
