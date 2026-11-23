@@ -135,11 +135,11 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.oleh == getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.username
         && request.resource.data.waktu == request.time
-        && request.resource.data.modul in ['anggota', 'akun', 'poin', 'gaji', 'jadwal']
+        && request.resource.data.modul in ['anggota', 'akun', 'poin', 'gaji', 'jadwal', 'rental']
         && request.resource.data.aksi is string && request.resource.data.aksi.size() >= 3 && request.resource.data.aksi.size() <= 300
         && request.resource.data.kolom is list && request.resource.data.kolom.size() <= 20
         && request.resource.data.target is string
-        && request.resource.data.target.matches('^(anggota|users|jadwal_jaga|penarikan_gaji)/[^/]+$|^pengaturan/poin$')
+        && request.resource.data.target.matches('^(anggota|users|jadwal_jaga|penarikan_gaji|sewa_barang|sewa_booking)/[^/]+$|^pengaturan/poin$')
         && getAfter(path('/databases/' + database + '/documents/' + request.resource.data.target)).data.get('jejakId', '') == id;
       allow update, delete: if false;
     }
@@ -187,6 +187,63 @@ service cloud.firestore {
             && berubahHanya(['status', 'diproses', 'diprosesOleh', 'jejakId']))
         )
         && jejakBaru('penarikan_gaji/' + id) && kolomTercatat();
+      allow delete: if false;
+    }
+
+    // ---------- Kopma Rental ----------
+    function kelolaSewa() { return petugas() || punyaHub(['ketua', 'sekretaris', 'bendahara', 'bidang_usaha', 'petugas_jaga']); }
+    function aturSewa() { return admin() || punyaHub(['ketua', 'bidang_usaha']); }
+    function tanggalSah(t) { return t is string && t.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'); }
+    function teks(d, k, maks) { return d.get(k, '') is string && d.get(k, '').size() <= maks; }
+
+    // Inventaris barang sewa dan harganya: boleh dibaca siapa pun (kalender publik), diatur bidang usaha/ketua/admin.
+    match /sewa_barang/{id} {
+      allow read: if true;
+      allow create, update: if aturSewa()
+        && request.resource.data.keys().hasOnly(['nama', 'spek', 'unit', 'harga24', 'harga2', 'batasHari', 'warna', 'aktif', 'jejakId'])
+        && request.resource.data.nama is string && request.resource.data.nama.size() >= 2 && request.resource.data.nama.size() <= 80
+        && teks(request.resource.data, 'spek', 200)
+        && request.resource.data.unit is int && request.resource.data.unit >= 1 && request.resource.data.unit <= 100
+        && request.resource.data.harga24 is int && request.resource.data.harga24 >= 0 && request.resource.data.harga24 <= 10000000
+        && request.resource.data.harga2 is int && request.resource.data.harga2 >= 0 && request.resource.data.harga2 <= 10000000
+        && request.resource.data.batasHari is int && request.resource.data.batasHari >= 1 && request.resource.data.batasHari <= 60
+        && request.resource.data.warna in ['sky', 'tangerine', 'grape', 'pink', 'coral', 'lime', 'mint', 'sun']
+        && request.resource.data.aktif is bool
+        && jejakBaru('sewa_barang/' + id) && (resource == null || kolomTercatat());
+      allow delete: if false;
+    }
+
+    // Booking lengkap (nama, WA, bayar, jaminan): hanya pengelola rental.
+    // Setiap booking punya salinan publik di sewa_jadwal dengan ID sama, yang isinya harus selalu cocok.
+    function jadwalSewa(id) { return getAfter(/databases/$(database)/documents/sewa_jadwal/$(id)).data; }
+    function bookingSewa(id) { return getAfter(/databases/$(database)/documents/sewa_booking/$(id)).data; }
+    function cocok(a, b) { return a.barangId == b.barangId && a.unit == b.unit && a.ambil == b.ambil && a.kembali == b.kembali && a.status == b.status; }
+    function bookingSah(d) {
+      return d.keys().hasOnly(['penyewa', 'wa', 'barangId', 'unit', 'ambil', 'kembali', 'status', 'total', 'dibayar', 'jaminan', 'dibuat', 'dibuatOleh', 'diubah', 'diubahOleh', 'jejakId'])
+        && d.penyewa is string && d.penyewa.size() >= 2 && d.penyewa.size() <= 100
+        && teks(d, 'wa', 30) && teks(d, 'jaminan', 100)
+        && d.barangId is string && exists(/databases/$(database)/documents/sewa_barang/$(d.barangId))
+        && d.unit is int && d.unit >= 1 && d.unit <= 100
+        && tanggalSah(d.ambil) && tanggalSah(d.kembali) && d.kembali > d.ambil
+        && d.status in ['Menunggu', 'Dikonfirmasi', 'Diambil', 'Selesai', 'Batal']
+        && d.total is int && d.total >= 0 && d.total <= 100000000
+        && d.dibayar is int && d.dibayar >= 0 && d.dibayar <= d.total;
+    }
+    match /sewa_booking/{id} {
+      allow read: if kelolaSewa();
+      allow create: if kelolaSewa() && bookingSah(request.resource.data)
+        && cocok(jadwalSewa(id), request.resource.data) && jejakBaru('sewa_booking/' + id);
+      allow update: if kelolaSewa() && bookingSah(request.resource.data)
+        && cocok(jadwalSewa(id), request.resource.data) && jejakBaru('sewa_booking/' + id) && kolomTercatat();
+      allow delete: if false;
+    }
+
+    // Salinan publik untuk kalender tanpa login: tanpa nama, WA, bayar, atau jaminan.
+    match /sewa_jadwal/{id} {
+      allow read: if true;
+      allow create, update: if kelolaSewa()
+        && request.resource.data.keys().hasOnly(['barangId', 'unit', 'ambil', 'kembali', 'status'])
+        && cocok(request.resource.data, bookingSewa(id));
       allow delete: if false;
     }
 

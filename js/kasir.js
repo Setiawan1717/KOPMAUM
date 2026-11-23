@@ -29,6 +29,8 @@ const Kasir = {
   // gaji jaga: 1% penjualan akun sendiri per hari, ditabung; penarikan minimal Rp10.000
   jadwal: [], jadwalError: '', penarikan: [], penarikanError: '', trxGaji: [], gajiError: '',
   laporanBulan: '', trxLaporan: [], laporanError: '', laporanSiap: false, _unsubLaporan: null,
+  // Kopma Rental: inventaris, booking lengkap (pengelola), salinan publik (tanpa login)
+  sewaBarang: [], sewaBooking: [], sewaError: '', publik: { on: false, barang: [], jadwal: [], error: '' }, _unsubPublik: [],
   get aksesKasir() { return ['admin', 'kasir'].includes(this.akun?.role); },
   get kelolaAkun() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'sekretaris'].includes(r)); },
   get bacaJejak() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'sekretaris', 'bendahara'].includes(r)); },
@@ -36,6 +38,8 @@ const Kasir = {
   get aturJadwal() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'bidang_usaha'].includes(r)); },
   get bacaLaporan() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'sekretaris', 'bendahara', 'bidang_usaha'].includes(r)); },
   get bacaAkun() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'sekretaris', 'bendahara', 'bidang_usaha'].includes(r)); },
+  get kelolaSewa() { return ['admin', 'kasir'].includes(this.akun?.role) || (this.akun?.hub || []).some((r) => ['ketua', 'sekretaris', 'bendahara', 'bidang_usaha', 'petugas_jaga'].includes(r)); },
+  get aturSewa() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'bidang_usaha'].includes(r)); },
   get bacaAnggota() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'sekretaris', 'bendahara'].includes(r)); },
   onChange: () => {},
   _fb: null, _unsubs: [],
@@ -70,7 +74,7 @@ const Kasir = {
     this._stop();
     const nia = this.akun?.nia || '';
     const poinSendiri = !this.aksesKasir && !!nia;
-    const perlu = 1 + (this.aksesKasir ? 4 : 0) + (this.bacaAnggota ? 1 : 0) + (nia && !this.bacaAnggota ? 1 : 0) + (poinSendiri ? 1 : 0) + (this.bacaAkun ? 1 : 0) + (this.bacaJejak ? 1 : 0) + 2 + (this.akun?.username ? 1 : 0);
+    const perlu = 1 + (this.aksesKasir ? 4 : 0) + (this.bacaAnggota ? 1 : 0) + (nia && !this.bacaAnggota ? 1 : 0) + (poinSendiri ? 1 : 0) + (this.bacaAkun ? 1 : 0) + (this.bacaJejak ? 1 : 0) + 2 + (this.akun?.username ? 1 : 0) + (this.kelolaSewa ? 2 : 0);
     let siap = 0;
     const done = () => { siap++; if (siap >= perlu) this._set({ on: true, status: 'on' }); else this.onChange(); };
     const fail = (e) => { this._stop(); this._set({ on: false, status: 'error', error: this._pesan(e) }); };
@@ -126,6 +130,14 @@ const Kasir = {
         this.trxGaji = s.docs.map((d) => ({ id: d.id, tanggal: d.data().tanggal, total: d.data().total, kasir: d.data().kasir }));
       }, 'gajiError')));
     }
+    if (this.kelolaSewa) {
+      this._unsubs.push(fs.onSnapshot(fs.collection(db, 'sewa_barang'), ...lunak((s) => {
+        this.sewaBarang = s.docs.map((d) => ({ ...d.data(), id: d.id })).sort((a, b) => String(a.nama).localeCompare(String(b.nama)));
+      }, 'sewaError')));
+      this._unsubs.push(fs.onSnapshot(fs.query(fs.collection(db, 'sewa_booking'), fs.orderBy('ambil', 'desc'), fs.limit(500)), ...lunak((s) => {
+        this.sewaBooking = s.docs.map((d) => ({ ...d.data(), id: d.id }));
+      }, 'sewaError')));
+    }
     if (this.bacaAkun) {
       this._unsubs.push(fs.onSnapshot(fs.collection(db, 'users'), ...lunak((s) => {
         this.akunList = s.docs.map((d) => ({ uid: d.id, ...d.data() })).sort((a, b) => String(a.username).localeCompare(String(b.username)));
@@ -177,7 +189,7 @@ const Kasir = {
     this._stop();
     Store.setPref('kasir', '');
     try { if (this._fb) await this._fb.auth.signOut(this._fb.authInst); } catch (e) { /* abaikan */ }
-    this._set({ on: false, status: 'off', products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '', rpPerPoin: 1000, rumusInfo: null, rumusError: '', email: '', akun: null, anggota: [], anggotaError: '', anggotaSaya: null, akunList: [], akunError: '', jejak: [], jejakError: '', jadwal: [], jadwalError: '', penarikan: [], penarikanError: '', trxGaji: [], gajiError: '', laporanBulan: '', trxLaporan: [], laporanError: '', laporanSiap: false });
+    this._set({ on: false, status: 'off', products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '', rpPerPoin: 1000, rumusInfo: null, rumusError: '', email: '', akun: null, anggota: [], anggotaError: '', anggotaSaya: null, akunList: [], akunError: '', jejak: [], jejakError: '', sewaBarang: [], sewaBooking: [], sewaError: '', jadwal: [], jadwalError: '', penarikan: [], penarikanError: '', trxGaji: [], gajiError: '', laporanBulan: '', trxLaporan: [], laporanError: '', laporanSiap: false });
   },
 
   // catatan jejak untuk satu perubahan; ditulis di batch/transaksi yang sama dengan perubahannya.
@@ -259,6 +271,56 @@ const Kasir = {
       if (lama) tx.update(ref, isi); else tx.set(ref, isi);
       return true;
     });
+  },
+
+  /* ---- Kopma Rental ---- */
+  // kalender publik: dibaca tanpa login (hanya inventaris dan salinan jadwal tanpa data penyewa)
+  async mulaiPublik() {
+    if (this.publik.on || this._unsubPublik.length) return;
+    try {
+      const { fs, db } = await this._load();
+      const upd = (patch) => { Object.assign(this.publik, patch); this.onChange(); };
+      const err = (e) => upd({ error: this._pesan(e), on: true });
+      this._unsubPublik.push(
+        fs.onSnapshot(fs.collection(db, 'sewa_barang'), (s) => upd({ on: true, barang: s.docs.map((d) => ({ ...d.data(), id: d.id })).filter((b) => b.aktif !== false).sort((a, b) => String(a.nama).localeCompare(String(b.nama))) }), err),
+        fs.onSnapshot(fs.query(fs.collection(db, 'sewa_jadwal'), fs.where('kembali', '>=', ymd(new Date(Date.now() - 62 * 864e5)))), (s) => upd({ jadwal: s.docs.map((d) => ({ ...d.data(), id: d.id })) }), err),
+      );
+    } catch (e) { Object.assign(this.publik, { on: true, error: this._pesan(e) }); this.onChange(); }
+  },
+  _cermin: (d) => ({ barangId: d.barangId, unit: d.unit, ambil: d.ambil, kembali: d.kembali, status: d.status }),
+  async simpanBarangSewa(data, id) {
+    const { fs, db } = await this._load();
+    const ref = id ? fs.doc(db, 'sewa_barang', id) : fs.doc(fs.collection(db, 'sewa_barang'));
+    return fs.runTransaction(db, async (tx) => {
+      const ada = await tx.get(ref); const lama = ada.exists() ? ada.data() : null;
+      const kolom = lama ? Object.keys(data).filter((k) => JSON.stringify(lama[k] ?? null) !== JSON.stringify(data[k] ?? null)) : [];
+      if (lama && !kolom.length) return false;
+      const NAMA = { nama: 'nama', spek: 'spesifikasi', unit: 'unit', harga24: 'harga 24 jam', harga2: 'harga harian', batasHari: 'batas hari', warna: 'warna', aktif: 'status aktif' };
+      const aksi = lama ? `Ubah barang sewa ${data.nama}: ${kolom.map((k) => (k === 'aktif' ? (data.aktif ? 'diaktifkan' : 'dinonaktifkan') : k === 'unit' ? `unit ${lama.unit} → ${data.unit}` : k.startsWith('harga') ? `${NAMA[k]} ${this._rp(lama[k])} → ${this._rp(data[k])}` : NAMA[k] || k)).join(', ')}`
+        : `Barang sewa baru: ${data.nama} (${data.unit} unit, ${this._rp(data.harga24)}/24 jam)`;
+      const jejakId = this._jejak(tx, { target: 'sewa_barang/' + ref.id, modul: 'rental', aksi, kolom });
+      if (lama) { const isi = {}; kolom.forEach((k) => { isi[k] = data[k]; }); tx.update(ref, { ...isi, jejakId }); } else tx.set(ref, { ...data, jejakId });
+      return true;
+    });
+  },
+  async buatBooking(data, aksi) {
+    const { fs, db } = await this._load();
+    const b = fs.writeBatch(db); const ref = fs.doc(fs.collection(db, 'sewa_booking'));
+    const jejakId = this._jejak(b, { target: 'sewa_booking/' + ref.id, modul: 'rental', aksi });
+    b.set(ref, { ...data, dibuat: new Date().toISOString(), dibuatOleh: this.akun.username, jejakId });
+    b.set(fs.doc(db, 'sewa_jadwal', ref.id), this._cermin(data));
+    await b.commit(); return ref.id;
+  },
+  async ubahBooking(bk, patch, aksi) {
+    const { fs, db } = await this._load();
+    const kolom = Object.keys(patch).filter((k) => JSON.stringify(bk[k] ?? null) !== JSON.stringify(patch[k] ?? null));
+    if (!kolom.length) return false;
+    const b = fs.writeBatch(db);
+    const jejakId = this._jejak(b, { target: 'sewa_booking/' + bk.id, modul: 'rental', aksi, kolom });
+    const isi = {}; kolom.forEach((k) => { isi[k] = patch[k]; });
+    b.update(fs.doc(db, 'sewa_booking', bk.id), { ...isi, diubah: new Date().toISOString(), diubahOleh: this.akun.username, jejakId });
+    if (kolom.some((k) => ['barangId', 'unit', 'ambil', 'kembali', 'status'].includes(k))) b.set(fs.doc(db, 'sewa_jadwal', bk.id), this._cermin({ ...bk, ...isi }));
+    await b.commit(); return true;
   },
 
   // daftar akun baru dengan kode pendaftaran (dicek aturan Firestore, bukan di sini)

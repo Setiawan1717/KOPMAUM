@@ -1,6 +1,6 @@
 # Aturan keamanan Firestore (project kopma-um)
 
-`firestore.rules` mengunci database web kasir supaya aman dipakai bersama Kopma Hub. Aturan ini disusun dari semua operasi yang ada di kode web kasir, dan sudah diuji di Firestore Emulator: 20 alur kasir tetap jalan dan 17 percobaan penyalahgunaan ditolak. Aturan koleksi `anggota` diuji terpisah (19 kasus), begitu juga pendaftaran dengan kode, perbarui data sendiri, dan pengaturan peran (38 kasus). Rumus poin bersama dan jejak wajib diuji 44 kasus; gaji jaga, jadwal, dan penarikan 55 kasus; ditambah uji alur di browser. Web kasir versi perbaikan juga sudah diuji ujung ke ujung (login, jualan dengan NIA, stok berkurang) terhadap aturan ini.
+`firestore.rules` mengunci database web kasir supaya aman dipakai bersama Kopma Hub. Aturan ini disusun dari semua operasi yang ada di kode web kasir, dan sudah diuji di Firestore Emulator: 20 alur kasir tetap jalan dan 17 percobaan penyalahgunaan ditolak. Aturan koleksi `anggota` diuji terpisah (19 kasus), begitu juga pendaftaran dengan kode, perbarui data sendiri, dan pengaturan peran (38 kasus). Rumus poin bersama dan jejak wajib diuji 44 kasus; gaji jaga, jadwal, dan penarikan 55 kasus; Kopma Rental 50 kasus; ditambah uji alur di browser. Web kasir versi perbaikan juga sudah diuji ujung ke ujung (login, jualan dengan NIA, stok berkurang) terhadap aturan ini.
 
 ## Masalah yang ditutup
 
@@ -83,6 +83,14 @@ Yang bisa membaca: ketua, sekretaris, bendahara, dan admin kasir. Perubahan oleh
 - Aturan Firestore tidak bisa menjumlah saldo, jadi kecukupan saldo dicek aplikasi saat mengajukan, dan dicek ulang dari transaksi saat ketua/bendahara menekan **Proses**.
 - **Daftar akun** (`users`) kini juga bisa dibaca bendahara dan bidang usaha, untuk memilih petugas di jadwal dan menampilkan nama. Mengubah peran tetap hanya ketua dan sekretaris.
 - Semua perubahan jadwal dan penarikan tercatat di Jejak.
+
+## Kopma Rental
+
+- **`sewa_barang`**: inventaris (nama, spesifikasi, unit, harga 24 jam, harga per hari untuk 2 hari ke atas, batas hari, aktif). Dibaca **siapa pun tanpa login** untuk halaman publik. Diatur bidang usaha, ketua, dan admin. Tidak bisa dihapus, cukup dinonaktifkan.
+- **`sewa_booking`**: data lengkap (penyewa, WA, barang, unit, tanggal ambil/kembali, status, total, sudah dibayar, jaminan). Hanya pengelola rental yang bisa membaca dan menulis: akun kasir/admin, petugas jaga, bidang usaha, ketua, sekretaris, bendahara. Pembayaran tidak boleh melebihi total; tanggal kembali harus setelah tanggal ambil. Tidak bisa dihapus (pakai status Batal).
+- **`sewa_jadwal`**: salinan publik setiap booking dengan ID yang sama, hanya berisi barang, unit, tanggal, dan status. Aturan memastikan isinya selalu sama dengan bookingnya, jadi kalender publik tidak bisa dipalsukan dan tidak pernah memuat data penyewa.
+- Ketersediaan unit dicek aplikasi sebelum menyimpan. Kalau dua orang menyimpan booking barang yang sama pada detik yang sama, keduanya bisa lolos; cek tab Booking bila ragu.
+- Semua perubahan inventaris dan booking tercatat di Jejak.
 
 ## Membuat akun kasir baru
 

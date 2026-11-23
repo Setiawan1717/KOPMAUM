@@ -106,9 +106,10 @@ const can = {
 };
 
 // Di mode akun sungguhan, modul yang datanya belum di Firebase disembunyikan supaya tidak tercampur data contoh.
-['akunView', 'akunEdit', 'anggotaView', 'anggotaFull', 'anggotaEdit', 'rentalView', 'rentalEdit', 'inventarisEdit', 'poinAdd', 'poinKoreksi', 'feeEdit', 'feeAll', 'jejak']
+['akunView', 'akunEdit', 'anggotaView', 'anggotaFull', 'anggotaEdit', 'poinAdd', 'poinKoreksi', 'feeEdit', 'feeAll', 'jejak']
   .forEach((k) => { const f = can[k]; can[k] = () => !isLive() && f(); });
 can.anggotaLiveView = () => isLive() && (has('ketua', 'sekretaris', 'bendahara') || Kasir.akun?.role === 'admin');
+['rentalView', 'rentalEdit', 'inventarisEdit'].forEach((k) => { const f = can[k]; can[k] = () => (isLive() ? (k === 'inventarisEdit' ? Kasir.aturSewa : Kasir.kelolaSewa) : f()); });
 can.jejakLive = () => isLive() && (has('ketua', 'sekretaris', 'bendahara') || Kasir.akun?.role === 'admin');
 can.anggotaLiveEdit = () => isLive() && has('ketua', 'sekretaris');
 const stokTersedia = () => can.stokView() && (!isLive() || Kasir.aksesKasir);
@@ -119,14 +120,20 @@ function catat(modul, aksi) { db.log.unshift({ id: uid('l'), olehId: meId, modul
 
 /* ================= Logika rental ================= */
 const AKTIF = ['Menunggu', 'Dikonfirmasi', 'Diambil'];
+// sumber data rental: halaman publik (salinan tanpa data penyewa), akun sungguhan (Firebase), atau demo
+const RB = () => (ui.view === 'sewa' ? Kasir.publik.barang : isLive() ? Kasir.sewaBarang : db.barangSewa);
+const RK = () => (ui.view === 'sewa' ? Kasir.publik.jadwal : isLive() ? Kasir.sewaBooking : db.booking);
+const aktifBrg = () => RB().filter((b) => b.aktif !== false);
+const barangDari = (id) => RB().find((x) => x.id === id) || { id, nama: '(barang tidak ditemukan)', warna: 'sky', unit: 0, harga24: 0, harga2: 0, batasHari: 1 };
+const bayarInfo = (b) => (!('dibayar' in b) ? null : b.dibayar >= b.total ? ['Lunas', 'mint'] : b.dibayar > 0 ? [`DP ${rp(b.dibayar)}`, 'sun'] : ['Belum bayar', 'coral']);
 const hariSewa = (b) => Math.max(1, diffDays(b.ambil, b.kembali));
 const hariTerpakai = (ambil, kembali) => { const n = Math.max(1, diffDays(ambil, kembali)); return Array.from({ length: n }, (_, i) => addDays(ambil, i)); };
 const terlambat = (b) => b.status === 'Diambil' && b.kembali < TODAY;
 function sisaUnit(barangId, tanggal, kecualiId) {
-  const item = db.barangSewa.find((x) => x.id === barangId);
-  const dipakai = db.booking.filter((b) => b.barangId === barangId && b.id !== kecualiId && (AKTIF.includes(b.status)) && hariTerpakai(b.ambil, b.kembali).includes(tanggal)).reduce((a, b) => a + b.unit, 0);
+  const item = barangDari(barangId);
+  const dipakai = RK().filter((b) => b.barangId === barangId && b.id !== kecualiId && (AKTIF.includes(b.status)) && hariTerpakai(b.ambil, b.kembali).includes(tanggal)).reduce((a, b) => a + b.unit, 0);
   // barang yang terlambat tetap memakai unit sampai dikembalikan
-  const telat = db.booking.filter((b) => b.barangId === barangId && b.id !== kecualiId && terlambat(b) && tanggal >= b.kembali && tanggal <= TODAY).reduce((a, b) => a + b.unit, 0);
+  const telat = RK().filter((b) => b.barangId === barangId && b.id !== kecualiId && terlambat(b) && tanggal >= b.kembali && tanggal <= TODAY).reduce((a, b) => a + b.unit, 0);
   return item.unit - dipakai - telat;
 }
 function cekKetersediaan(barangId, ambil, kembali, unit, kecualiId) {
@@ -167,6 +174,7 @@ const navLabel = (n) => (n.labelFn ? n.labelFn() : n.label);
 
 function route() {
   const h = location.hash.replace('#', '');
+  if (h === 'sewa') { ui.view = 'sewa'; return; }
   const n = NAV.find((x) => x.id === h && x.show());
   ui.view = n ? n.id : 'dasbor';
 }
@@ -174,6 +182,7 @@ function route() {
 /* ================= Render ================= */
 const app = () => $('#app');
 function render() {
+  if (location.hash === '#sewa') { ui.view = 'sewa'; app().innerHTML = viewSewaPublik(); return; }
   if (isLive() && !Kasir.on) {
     if (Kasir.status === 'connecting') { app().innerHTML = `<div class="login-form c-sky" style="min-height:100vh"><div class="inner" style="text-align:center;justify-items:center"><img src="logo-kopma.png" alt="" style="width:64px;height:64px;border-radius:50%;background:#fff;padding:4px"><h2>Memuat Kopma Hub…</h2><p class="muted">Mengambil data dari Firebase.</p></div></div>`; return; }
     ui.loginError = Kasir.status === 'error' ? Kasir.error : ''; meId = null; Store.setPref('me', '');
@@ -265,6 +274,7 @@ function viewLogin() {
             <button class="btn btn-primary" type="submit" id="daftarBtn">Daftar</button>
           </form>` : `<div class="card-head" style="margin:0"><div><b>Belum punya akun?</b><p class="small muted">Daftar sendiri dengan kode pendaftaran dari pengurus.</p></div><button type="button" class="btn btn-soft" data-act="daftar-buka">Daftar</button></div>`}
         </section>
+        <a class="btn btn-soft c-tangerine" href="#sewa">${ic('cal', 'icon-sm')}Cek ketersediaan barang sewa</a>
         <details class="demo-box">
           <summary>Lihat mode demo (data contoh, bukan data asli)</summary>
           <p class="small muted" style="margin:8px 0 10px">Untuk mencoba tampilan tiap peran. Tidak tersambung ke Firebase dan tidak menyimpan apa pun ke data asli.</p>
@@ -290,7 +300,7 @@ function viewDasbor() {
   if (isLive() && Kasir.akun?.username && (Kasir.trxGaji.length || Kasir.penarikan.some((x) => x.uid === Kasir.akun.uid))) tiles.push(`<a href="#fee" class="tile c-pink"><span class="t-icon">${ic('wallet')}</span><span class="t-val num">${rp(Kasir.gajiSaya.saldo)}</span><span class="t-lbl">Saldo gaji jagamu</span></a>`);
   if (can.anggotaLiveView()) tiles.push(`<a href="#anggota" class="tile c-sky"><span class="t-icon">${ic('users')}</span><span class="t-val num">${Kasir.anggota.filter((x) => x.aktif !== false).length}</span><span class="t-lbl">Anggota terdaftar</span></a>`);
   if (can.rentalView()) {
-    const aktif = db.booking.filter((b) => AKTIF.includes(b.status)).length;
+    const aktif = RK().filter((b) => AKTIF.includes(b.status)).length;
     tiles.push(`<a href="#rental" class="tile c-tangerine"><span class="t-icon">${ic('cal')}</span><span class="t-val num">${aktif}</span><span class="t-lbl">Booking aktif</span></a>`);
   }
   if (stokTersedia() && Kasir.on) { const h = Kasir.penjualanHari(TODAY); tiles.push(`<a href="#stok" class="tile c-mint"><span class="t-icon">${ic('cart')}</span><span class="t-val num">${rp(h.total)}</span><span class="t-lbl">Penjualan hari ini · ${h.n} transaksi</span></a>`); }
@@ -298,8 +308,8 @@ function viewDasbor() {
   if (can.anggotaFull()) tiles.push(`<a href="#anggota" class="tile c-sky"><span class="t-icon">${ic('users')}</span><span class="t-val num">${db.profil.filter((x) => x.aktif).length}</span><span class="t-lbl">Anggota terdaftar</span></a>`);
   if (!can.rentalView() && !isLive()) tiles.push(`<a href="#anggota" class="tile c-mint"><span class="t-icon">${ic('check')}</span><span class="t-val">${simpananLunas(meId) ? 'Lunas' : 'Belum'}</span><span class="t-lbl">Status simpananmu</span></a>`);
 
-  const late = can.rentalView() ? db.booking.filter(terlambat) : [];
-  const upcoming = can.rentalView() ? db.booking.filter((b) => ['Menunggu', 'Dikonfirmasi'].includes(b.status) && b.ambil >= TODAY && b.ambil <= addDays(TODAY, 7)).sort((a, b) => a.ambil.localeCompare(b.ambil)) : [];
+  const late = can.rentalView() ? RK().filter(terlambat) : [];
+  const upcoming = can.rentalView() ? RK().filter((b) => ['Menunggu', 'Dikonfirmasi'].includes(b.status) && b.ambil >= TODAY && b.ambil <= addDays(TODAY, 7)).sort((a, b) => a.ambil.localeCompare(b.ambil)) : [];
 
   const quick = [];
   if (can.poinAdd()) quick.push(`<a class="btn btn-primary c-grape" href="#poin" data-act="go-catat">${ic('star', 'icon-sm')}Catat belanja anggota</a>`);
@@ -572,7 +582,7 @@ function listStok() {
 
 /* ---------- Rental ---------- */
 function bookingRow(b) {
-  const item = db.barangSewa.find((x) => x.id === b.barangId);
+  const item = barangDari(b.barangId); const bayar = bayarInfo(b);
   const late = terlambat(b);
   const nexts = can.rentalEdit() ? (NEXT[b.status] || []) : [];
   return `<div class="row ${late ? 'alert' : ''}">
@@ -580,10 +590,11 @@ function bookingRow(b) {
     <div class="grow">
       <div class="title">${esc(b.penyewa)}</div>
       <div class="sub">${esc(item.nama)} × ${b.unit} · ${tgl(b.ambil)} → ${tgl(b.kembali)} (${hariSewa(b)} hari)</div>
+      ${b.jaminan ? `<div class="sub">Jaminan: ${esc(b.jaminan)}</div>` : ''}
       ${late ? `<div class="small" style="color:var(--coral-ink);font-weight:700;margin-top:2px">${ic('alert', 'icon-sm')} Terlambat ${diffDays(b.kembali, TODAY)} hari</div>` : ''}
-      ${nexts.length ? `<div class="actions" style="margin-top:8px">${nexts.map((n) => `<button class="btn btn-sm ${n === 'Batal' ? 'btn-ghost' : 'btn-soft c-' + STATUS_COLOR[n]}" data-act="booking-status" data-id="${b.id}" data-s="${n}">${NEXT_LABEL[n]}</button>`).join('')}</div>` : ''}
+      ${nexts.length ? `<div class="actions" style="margin-top:8px">${nexts.map((n) => `<button class="btn btn-sm ${n === 'Batal' ? 'btn-ghost' : 'btn-soft c-' + STATUS_COLOR[n]}" data-act="booking-status" data-id="${esc(b.id)}" data-s="${n}">${NEXT_LABEL[n]}</button>`).join('')}</div>` : ''}
     </div>
-    <div class="end"><span class="pill c-${late ? 'coral' : STATUS_COLOR[b.status]}">${late ? 'Terlambat' : b.status}</span><b class="num">${rp(b.total)}</b></div>
+    <div class="end"><span class="pill c-${late ? 'coral' : STATUS_COLOR[b.status]}">${late ? 'Terlambat' : b.status}</span><b class="num">${rp(b.total)}</b>${bayar ? `<span class="pill c-${bayar[1]}">${esc(bayar[0])}</span>` : ''}${bayar && can.rentalEdit() && b.status !== 'Batal' ? `<button class="btn btn-ghost btn-sm" data-act="booking-bayar" data-id="${esc(b.id)}">Bayar & jaminan</button>` : ''}</div>
   </div>`;
 }
 function calendarHtml(item, pub) {
@@ -615,11 +626,12 @@ function calendarHtml(item, pub) {
 }
 function viewRental() {
   const tabs = [['kalender', 'Kalender'], ['booking', 'Booking'], ['inventaris', 'Inventaris']];
-  const item = db.barangSewa.find((x) => x.id === ui.rentalItem) || db.barangSewa[0];
+  const item = aktifBrg().find((x) => x.id === ui.rentalItem) || aktifBrg()[0];
+  if (!item && ui.rentalTab === 'kalender') ui.rentalTab = 'inventaris';
   let body = '';
   if (ui.rentalTab === 'kalender') {
     body = `
-    <div class="chips" role="tablist" aria-label="Pilih barang">${db.barangSewa.map((b) => `<button class="chip c-${b.warna} ${b.id === item.id ? 'on' : ''}" data-act="rental-item" data-id="${b.id}">${esc(b.nama)}</button>`).join('')}</div>
+    <div class="chips" role="tablist" aria-label="Pilih barang">${aktifBrg().map((b) => `<button class="chip c-${b.warna} ${b.id === item.id ? 'on' : ''}" data-act="rental-item" data-id="${b.id}">${esc(b.nama)}</button>`).join('')}</div>
     <div class="grid grid-2">
       <section class="card c-${item.warna} ${ui.publicView ? 'public-frame' : ''}">
         ${ui.publicView ? `<div class="notice c-sky" style="margin-bottom:12px">${ic('globe')}<span>Begini kalender tampil di web eksternal. Hanya status tersedia atau penuh, tanpa nama dan nomor penyewa.</span></div>` : ''}
@@ -635,34 +647,57 @@ function viewRental() {
         </dl>
         <div class="actions" style="margin-top:16px">
           ${can.rentalEdit() ? `<button class="btn btn-primary" data-act="booking-baru" data-item="${item.id}">${ic('plus', 'icon-sm')}Booking ${esc(item.nama.split(' ')[0])}</button>` : ''}
-          <button class="btn btn-soft c-sky" data-act="toggle-public">${ic('globe', 'icon-sm')}${ui.publicView ? 'Kembali ke tampilan internal' : 'Lihat versi publik'}</button>
+          ${isLive() ? `<a class="btn btn-soft c-sky" href="#sewa" target="_blank" rel="noopener">${ic('globe', 'icon-sm')}Buka halaman publik</a>` : `<button class="btn btn-soft c-sky" data-act="toggle-public">${ic('globe', 'icon-sm')}${ui.publicView ? 'Kembali ke tampilan internal' : 'Lihat versi publik'}</button>`}
         </div>
         <div class="divider" style="margin:16px 0"></div>
         <h3 style="margin-bottom:8px">Booking barang ini</h3>
-        <div class="list">${db.booking.filter((b) => b.barangId === item.id && AKTIF.includes(b.status)).sort((a, b) => a.ambil.localeCompare(b.ambil)).map(bookingRow).join('') || empty('cal', 'Belum ada booking aktif.')}</div>
+        <div class="list">${RK().filter((b) => b.barangId === item.id && AKTIF.includes(b.status)).sort((a, b) => a.ambil.localeCompare(b.ambil)).map(bookingRow).join('') || empty('cal', 'Belum ada booking aktif.')}</div>
       </section>
     </div>`;
   } else if (ui.rentalTab === 'booking') {
     const f = ui.bookingFilter;
     const filters = [['aktif', 'Aktif'], ['terlambat', 'Terlambat'], ['Menunggu', 'Menunggu'], ['Dikonfirmasi', 'Dikonfirmasi'], ['Diambil', 'Diambil'], ['Selesai', 'Selesai'], ['Batal', 'Batal']];
     const match = (b, k) => (k === 'aktif' ? AKTIF.includes(b.status) : k === 'terlambat' ? terlambat(b) : b.status === k);
-    const rows = db.booking.filter((b) => match(b, f)).sort((a, b) => (terlambat(b) - terlambat(a)) || a.ambil.localeCompare(b.ambil));
-    body = `<div class="chips">${filters.map(([k, l]) => `<button class="chip c-${k === 'terlambat' ? 'coral' : STATUS_COLOR[k] || 'tangerine'} ${f === k ? 'on' : ''}" data-act="booking-filter" data-k="${k}">${l}<span class="count num">${db.booking.filter((b) => match(b, k)).length}</span></button>`).join('')}</div>
+    const rows = RK().filter((b) => match(b, f)).sort((a, b) => (terlambat(b) - terlambat(a)) || a.ambil.localeCompare(b.ambil));
+    body = `<div class="chips">${filters.map(([k, l]) => `<button class="chip c-${k === 'terlambat' ? 'coral' : STATUS_COLOR[k] || 'tangerine'} ${f === k ? 'on' : ''}" data-act="booking-filter" data-k="${k}">${l}<span class="count num">${RK().filter((b) => match(b, k)).length}</span></button>`).join('')}</div>
     <div class="list">${rows.length ? rows.map(bookingRow).join('') : empty('cal', 'Tidak ada booking di kategori ini.')}</div>`;
   } else {
-    body = `<div class="grid grid-2">${db.barangSewa.map((b) => `
+    body = !RB().length ? empty('box', can.inventarisEdit() ? 'Belum ada barang sewa. Tekan "Barang sewa" untuk menambahkan.' : 'Belum ada barang sewa. Bidang usaha atau ketua yang menambahkan.', 'tangerine') : `<div class="grid grid-2">${RB().map((b) => `
       <section class="card c-${b.warna}">
-        <div class="card-head"><h3>${esc(b.nama)}</h3><span class="pill">${b.unit} unit</span></div>
+        <div class="card-head"><h3>${esc(b.nama)}</h3><span class="pill">${b.unit} unit</span>${b.aktif === false ? '<span class="pill c-coral">Nonaktif</span>' : ''}</div>
         <p class="muted small">${esc(b.spek)}</p>
         <dl class="kv" style="margin-top:10px"><dt>24 jam</dt><dd class="num">${rp(b.harga24)}</dd><dt>2 hari+</dt><dd class="num">${rp(b.harga2)} / hari</dd><dt>Batas</dt><dd class="num">${b.batasHari} hari</dd></dl>
-        ${can.inventarisEdit() ? `<div class="actions" style="margin-top:12px"><button class="btn btn-soft btn-sm" data-act="sewa-form" data-id="${b.id}">${ic('edit', 'icon-sm')}Ubah</button></div>` : ''}
+        ${can.inventarisEdit() ? `<div class="actions" style="margin-top:12px"><button class="btn btn-soft btn-sm" data-act="sewa-form" data-id="${esc(b.id)}">${ic('edit', 'icon-sm')}Ubah</button></div>` : ''}
       </section>`).join('')}</div>`;
   }
   return `
-  ${pageHead('Kopma Rental', 'Jadwal di sini otomatis tampil di kalender web eksternal. Sistem menolak booking kalau unit tidak cukup.',
+  ${pageHead('Kopma Rental', isLive() ? 'Jadwal di sini otomatis tampil di halaman publik (tanpa nama dan nomor penyewa). Sistem menolak booking kalau unit tidak cukup.' : 'Jadwal di sini otomatis tampil di kalender web eksternal. Sistem menolak booking kalau unit tidak cukup.',
     `${exportBtn('booking')}${can.inventarisEdit() ? `<button class="btn btn-ghost" data-act="sewa-form" data-id="">${ic('plus', 'icon-sm')}Barang sewa</button>` : ''}${can.rentalEdit() ? `<button class="btn btn-primary" data-act="booking-baru">${ic('plus', 'icon-sm')}Booking baru</button>` : ''}`)}
+  ${isLive() && Kasir.sewaError ? `<div class="notice c-coral">${ic('alert')}<span>Data rental gagal dimuat: ${esc(Kasir.sewaError)}</span></div>` : ''}
   <div class="seg">${tabs.map(([k, l]) => `<button class="${ui.rentalTab === k ? 'on' : ''}" data-act="rental-tab" data-k="${k}">${l}</button>`).join('')}</div>
   ${body}`;
+}
+
+/* ---------- Halaman publik Kopma Rental (tanpa login, #sewa) ---------- */
+function viewSewaPublik() {
+  Kasir.mulaiPublik();
+  const P = Kasir.publik; const list = RB();
+  const item = list.find((x) => x.id === ui.rentalItem) || list[0];
+  const isi = !P.on ? empty('cal', 'Memuat jadwal sewa…') : P.error ? `<div class="notice c-coral">${ic('alert')}<span>${esc(P.error)}</span></div>` : !item ? empty('box', 'Belum ada barang yang disewakan.', 'tangerine') : `
+    <div class="chips" role="tablist" aria-label="Pilih barang">${list.map((b) => `<button class="chip c-${b.warna} ${b.id === item.id ? 'on' : ''}" data-act="rental-item" data-id="${esc(b.id)}">${esc(b.nama)}</button>`).join('')}</div>
+    <div class="grid grid-2">
+      <section class="card c-${item.warna}">${calendarHtml(item, true)}</section>
+      <section class="card c-${item.warna}">
+        <div class="card-head"><div><span class="eyebrow">Barang</span><h2>${esc(item.nama)}</h2></div><span class="pill">${item.unit} unit</span></div>
+        ${item.spek ? `<p class="muted small">${esc(item.spek)}</p>` : ''}
+        <dl class="kv" style="margin-top:12px"><dt>Sewa 24 jam</dt><dd class="num">${rp(item.harga24)}</dd><dt>2 hari ke atas</dt><dd class="num">${rp(item.harga2)} / hari</dd><dt>Batas sewa</dt><dd class="num">${item.batasHari} hari</dd></dl>
+        <div class="notice c-sky" style="margin-top:14px">${ic('globe')}<span>Untuk booking, hubungi pengurus Kopma UM atau datang langsung ke Kopma Mart. Tanggal berwarna merah sudah penuh.</span></div>
+      </section>
+    </div>`;
+  return `<div class="main c-tangerine" id="main" style="min-height:100vh"><div class="main-inner">
+    <div class="page-head"><div><span class="badge-mod">${ic('cal')}Kopma Rental</span><h1>Sewa barang Kopma UM</h1><p class="muted">Cek ketersediaan barang sewa per tanggal. Halaman ini bisa dibuka siapa saja tanpa login.</p></div>
+    <div class="actions"><a class="btn btn-ghost" href="#">${ic('left', 'icon-sm')}${me() ? 'Kembali ke Kopma Hub' : 'Masuk Kopma Hub'}</a></div></div>
+    ${isi}</div></main>`;
 }
 
 /* ---------- Poin ---------- */
@@ -944,7 +979,7 @@ function viewAkun() {
 
 /* ---------- Jejak ---------- */
 function viewJejakLive() {
-  const MOD = { semua: ['Semua', 'coral'], anggota: ['Anggota', 'sky'], akun: ['Akun', 'mint'], poin: ['Poin', 'grape'] };
+  const MOD = { semua: ['Semua', 'coral'], anggota: ['Anggota', 'sky'], akun: ['Akun', 'mint'], rental: ['Rental', 'tangerine'], poin: ['Poin', 'grape'], gaji: ['Gaji', 'pink'], jadwal: ['Jadwal', 'lime'] };
   if (!MOD[ui.jejakModul]) ui.jejakModul = 'semua';
   const nama = (u) => Kasir.akunList.find((a) => a.username === u)?.nama || u;
   const rows = Kasir.jejak.filter((l) => ui.jejakModul === 'semua' || l.modul === ui.jejakModul);
@@ -1002,7 +1037,8 @@ function commit(msg, color, modul, aksi) { if (aksi) catat(modul, aksi); save();
 
 /* ================= Form modal builders ================= */
 function modalBooking(itemId, tanggal) {
-  const item = itemId || ui.rentalItem;
+  if (!aktifBrg().length) { toast('Belum ada barang sewa aktif. Tambahkan dulu di Inventaris.', 'coral'); return; }
+  const item = aktifBrg().some((b) => b.id === itemId) ? itemId : aktifBrg().some((b) => b.id === ui.rentalItem) ? ui.rentalItem : aktifBrg()[0].id;
   const ambil = tanggal || TODAY;
   openModal('Booking baru', `
   <form class="form" data-form="booking" id="bookingForm">
@@ -1011,7 +1047,7 @@ function modalBooking(itemId, tanggal) {
       <div class="field"><label for="bkWa">Nomor WA</label><input class="input num" id="bkWa" name="wa" inputmode="tel" placeholder="08…" required></div>
     </div>
     <div class="form-row">
-      <div class="field"><label for="bkBarang">Barang</label><select class="input" id="bkBarang" name="barangId" data-live="booking">${db.barangSewa.map((b) => `<option value="${b.id}" ${b.id === item ? 'selected' : ''}>${esc(b.nama)} (${b.unit} unit)</option>`).join('')}</select></div>
+      <div class="field"><label for="bkBarang">Barang</label><select class="input" id="bkBarang" name="barangId" data-live="booking">${aktifBrg().map((b) => `<option value="${esc(b.id)}" ${b.id === item ? 'selected' : ''}>${esc(b.nama)} (${b.unit} unit)</option>`).join('')}</select></div>
       <div class="field"><label for="bkUnit">Jumlah unit</label><input class="input num" id="bkUnit" name="unit" type="number" min="1" value="1" data-live="booking" required></div>
     </div>
     <div class="form-row">
@@ -1019,19 +1055,23 @@ function modalBooking(itemId, tanggal) {
       <div class="field"><label for="bkKembali">Tanggal kembali</label><input class="input" id="bkKembali" name="kembali" type="date" value="${addDays(ambil, 1)}" data-live="booking" required></div>
     </div>
     <div class="field"><label for="bkStatus">Status awal</label><select class="input" id="bkStatus" name="status"><option>Dikonfirmasi</option><option>Menunggu</option></select></div>
+    <div class="form-row">
+      <div class="field"><label for="bkBayar">Sudah dibayar (Rp)</label><input class="input num" id="bkBayar" name="dibayar" type="number" inputmode="numeric" min="0" step="500" value="0" data-live="booking"><span class="hint">Isi 0 kalau belum bayar, sebagian kalau DP.</span></div>
+      <div class="field"><label for="bkJaminan">Jaminan</label><input class="input" id="bkJaminan" name="jaminan" maxlength="100" placeholder="contoh: KTM a.n. penyewa"></div>
+    </div>
     <div class="preview" id="bkPreview"></div>
   </form>`, 'tangerine', `<button class="btn btn-ghost" data-act="close-modal">Batal</button><button class="btn btn-primary" form="bookingForm" type="submit" id="bkSubmit">Simpan booking</button>`);
   previewBooking();
 }
 function previewBooking() {
   const f = $('#bookingForm'); if (!f) return;
-  const item = db.barangSewa.find((b) => b.id === f.barangId.value);
+  const item = barangDari(f.barangId.value);
   const unit = Math.max(1, parseInt(f.unit.value || '1', 10));
   const { ambil, kembali } = { ambil: f.ambil.value, kembali: f.kembali.value };
   const out = $('#bkPreview'), btn = $('#bkSubmit');
   let err = '';
   if (!ambil || !kembali) err = 'Isi tanggal ambil dan kembali.';
-  else if (kembali < ambil) err = 'Tanggal kembali tidak boleh sebelum tanggal ambil.';
+  else if (kembali <= ambil) err = 'Tanggal kembali minimal sehari setelah tanggal ambil (sewa 24 jam).';
   else if (unit > item.unit) err = `${item.nama} hanya punya ${item.unit} unit.`;
   else if (Math.max(1, diffDays(ambil, kembali)) > item.batasHari) err = `Batas sewa ${item.nama} adalah ${item.batasHari} hari.`;
   let html = '';
@@ -1040,6 +1080,8 @@ function previewBooking() {
     const hari = Math.max(1, diffDays(ambil, kembali));
     const total = hitungBiaya(item, ambil, kembali, unit);
     if (!cek.ok) err = `Unit tidak cukup pada ${tglPanjang(cek.hariBentrok.d)}: tersisa ${Math.max(0, cek.hariBentrok.s)} unit.`;
+    const dibayar = parseInt(f.dibayar?.value || '0', 10) || 0;
+    if (dibayar < 0 || dibayar > total) err = err || `Pembayaran tidak boleh lebih dari total ${rp(total)}.`;
     html = `<div class="line"><span>Durasi</span><b class="num">${hari} hari</b></div>
       <div class="line"><span>Tarif</span><span class="num">${hari === 1 ? rp(item.harga24) + ' / 24 jam' : rp(item.harga2) + ' × ' + hari + ' hari'} × ${unit} unit</span></div>
       <div class="line"><span>Total biaya</span><span class="total num">${rp(total)}</span></div>
@@ -1172,23 +1214,41 @@ const ACT = {
   'cal-nav': (el) => { const [y, m] = ui.calMonth.split('-').map(Number); const d = new Date(y, m - 1 + Number(el.dataset.n), 1); ui.calMonth = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; render(); },
   'toggle-public': () => { ui.publicView = !ui.publicView; render(); },
   'cal-day': (el) => {
-    const d = el.dataset.d; const item = db.barangSewa.find((x) => x.id === ui.rentalItem);
-    const list = db.booking.filter((b) => b.barangId === item.id && AKTIF.includes(b.status) && (hariTerpakai(b.ambil, b.kembali).includes(d) || (terlambat(b) && d >= b.kembali && d <= TODAY)));
+    const d = el.dataset.d; const item = RB().find((x) => x.id === ui.rentalItem);
+    const list = RK().filter((b) => b.barangId === item.id && AKTIF.includes(b.status) && (hariTerpakai(b.ambil, b.kembali).includes(d) || (terlambat(b) && d >= b.kembali && d <= TODAY)));
     const sisa = sisaUnit(item.id, d);
     openModal(tglPanjang(d), `<p class="muted" style="margin-bottom:12px">${esc(item.nama)} · sisa <b class="num">${Math.max(0, sisa)} dari ${item.unit}</b> unit</p><div class="list">${list.length ? list.map(bookingRow).join('') : empty('check', 'Belum ada yang menyewa di tanggal ini.', 'mint')}</div>`, item.warna,
       can.rentalEdit() && sisa > 0 && d >= TODAY ? `<button class="btn btn-primary" data-act="booking-baru" data-item="${item.id}" data-d="${d}">${ic('plus', 'icon-sm')}Booking mulai tanggal ini</button>` : '');
   },
+  'booking-bayar': (el) => {
+    const b = RK().find((x) => x.id === el.dataset.id); if (!b) return;
+    openModal(`Bayar & jaminan · ${esc(b.penyewa)}`, `<form class="form" data-form="bayarSewa" id="bayarForm"><input type="hidden" name="id" value="${esc(b.id)}">
+      <div class="preview"><div class="line"><span>Total sewa</span><span class="total num">${rp(b.total)}</span></div><div class="line small"><span>Sudah dibayar</span><span class="num">${rp(b.dibayar || 0)}</span></div></div>
+      <div class="field"><label for="byNominal">Total yang sudah dibayar (Rp)</label><input class="input num" id="byNominal" name="dibayar" type="number" inputmode="numeric" min="0" max="${b.total}" step="500" value="${b.dibayar || 0}" required>
+        <div class="chips" style="margin-top:6px"><button type="button" class="chip c-mint" data-act="bayar-lunas" data-n="${b.total}">Lunas ${rp(b.total)}</button></div></div>
+      <div class="field"><label for="byJaminan">Jaminan</label><input class="input" id="byJaminan" name="jaminan" maxlength="100" value="${esc(b.jaminan || '')}" placeholder="contoh: KTM a.n. penyewa"><span class="hint">Kosongkan kalau jaminan sudah dikembalikan.</span></div></form>`, 'tangerine',
+      `<button class="btn btn-ghost" data-act="close-modal">Batal</button><button class="btn btn-primary" form="bayarForm" type="submit" id="byBtn">Simpan</button>`);
+  },
+  'bayar-lunas': (el) => { $('#byNominal').value = el.dataset.n; },
   'booking-filter': (el) => { ui.bookingFilter = el.dataset.k; render(); },
   'booking-baru': (el) => modalBooking(el.dataset.item, el.dataset.d),
   'booking-status': (el) => {
-    const b = db.booking.find((x) => x.id === el.dataset.id); const s = el.dataset.s;
-    const doIt = () => { const lama = b.status; b.status = s; commit(`Booking ${esc(b.penyewa)} → ${s}`, STATUS_COLOR[s], 'rental', `Booking ${b.penyewa} (${db.barangSewa.find((x) => x.id === b.barangId).nama}): ${lama} → ${s}`); };
+    const b = RK().find((x) => x.id === el.dataset.id); const s = el.dataset.s;
+    if (isLive()) {
+      const go = async () => { try { await Kasir.ubahBooking(b, { status: s }, `Booking ${b.penyewa} (${barangDari(b.barangId).nama}): ${b.status} → ${s}`); closeModal(); toast(`Booking ${esc(b.penyewa)} → ${s}`, STATUS_COLOR[s]); render(); } catch (e) { toast(Kasir._pesan(e), 'coral'); } };
+      if (s === 'Batal') confirmBox('Batalkan booking ini?', `${esc(b.penyewa)} · ${tgl(b.ambil)} → ${tgl(b.kembali)}. Unit akan tersedia lagi di kalender.`, 'Ya, batalkan', go);
+      else if (s === 'Selesai' && b.dibayar < b.total) confirmBox('Pembayaran belum lunas', `${esc(b.penyewa)} baru membayar ${rp(b.dibayar)} dari ${rp(b.total)}. Tetap tandai barang sudah kembali?`, 'Ya, tandai kembali', go);
+      else go();
+      return;
+    }
+    const doIt = () => { const lama = b.status; b.status = s; commit(`Booking ${esc(b.penyewa)} → ${s}`, STATUS_COLOR[s], 'rental', `Booking ${b.penyewa} (${RB().find((x) => x.id === b.barangId).nama}): ${lama} → ${s}`); };
     if (s === 'Batal') confirmBox('Batalkan booking ini?', `${esc(b.penyewa)} · ${tgl(b.ambil)} → ${tgl(b.kembali)}. Unit akan tersedia lagi di kalender.`, 'Ya, batalkan', doIt); else doIt();
   },
   'sewa-form': (el) => {
-    const b = el.dataset.id ? db.barangSewa.find((x) => x.id === el.dataset.id) : null;
+    const b = el.dataset.id ? RB().find((x) => x.id === el.dataset.id) : null;
+    const aktifHtml = isLive() && b ? `<label class="small" style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="aktif" ${b.aktif !== false ? 'checked' : ''}> Masih disewakan (hapus centang untuk menyembunyikan dari kalender dan form booking)</label>` : '';
     openModal(b ? 'Ubah barang sewa' : 'Barang sewa baru', `
-    <form class="form" data-form="sewa" id="sewaForm"><input type="hidden" name="id" value="${b?.id || ''}">
+    <form class="form" data-form="sewa" id="sewaForm"><input type="hidden" name="id" value="${esc(b?.id || '')}">${aktifHtml}
       <div class="field"><label for="swNama">Nama barang</label><input class="input" id="swNama" name="nama" required value="${esc(b?.nama || '')}"></div>
       <div class="field"><label for="swSpek">Spesifikasi</label><input class="input" id="swSpek" name="spek" value="${esc(b?.spek || '')}"></div>
       <div class="form-row"><div class="field"><label for="swUnit">Jumlah unit</label><input class="input num" id="swUnit" name="unit" type="number" min="1" required value="${b?.unit || 1}"></div><div class="field"><label for="swBatas">Batas hari</label><input class="input num" id="swBatas" name="batasHari" type="number" min="1" required value="${b?.batasHari || 3}"></div></div>
@@ -1295,7 +1355,7 @@ const ACT = {
     const T = {
       anggota: isLive() ? [['Nama', 'NIA', 'Fakultas', 'Prodi', 'Status', 'Bidang', 'Angkatan', 'WA', 'Aktif'], Kasir.anggota.map((a) => [a.nama, a.nia, a.fakultas || '', a.prodi || '', a.status, a.bidang || '', a.angkatan || '', a.wa || '', a.aktif === false ? 'Tidak' : 'Ya'])] : [['Nama', 'NIA', 'Prodi', 'Angkatan', 'WA', 'Status', 'Bidang', 'Pendamping', 'Simpanan lunas'], db.profil.map((p) => [p.nama, p.nia, p.prodi, p.angkatan, p.wa, p.status, p.bidang || '', p.pendampingId ? prof(p.pendampingId).nama : '', simpananLunas(p.id) ? 'Ya' : 'Belum'])],
       stok: [['Barang', 'Kategori', 'Harga beli', 'Harga jual', 'Stok', 'Minimum'], martItems().map((b) => [b.nama, b.kategori, b.hargaBeli, b.hargaJual, b.stok, b.min])],
-      booking: [['Penyewa', 'WA', 'Barang', 'Unit', 'Ambil', 'Kembali', 'Total', 'Status'], db.booking.map((b) => [b.penyewa, b.wa, db.barangSewa.find((x) => x.id === b.barangId).nama, b.unit, b.ambil, b.kembali, b.total, b.status])],
+      booking: [['Penyewa', 'WA', 'Barang', 'Unit', 'Ambil', 'Kembali', 'Total', 'Status'], RK().map((b) => [b.penyewa, b.wa, RB().find((x) => x.id === b.barangId).nama, b.unit, b.ambil, b.kembali, b.total, b.status])],
       poin: Kasir.on ? [['NIA', 'Nama', 'Jumlah belanja', 'Total belanja', 'Poin', 'Terakhir belanja'], [...Kasir.poinPer(rpPerPoin()).values()].map((d) => [d.nia, anggotaByNia(d.nia)?.nama || '', d.n, d.belanja, d.poin, d.terakhir])] : [['Anggota', 'NIA', 'Belanja', 'Poin', 'Alasan', 'Pencatat', 'Waktu'], db.poin.map((x) => [prof(x.userId).nama, prof(x.userId).nia, x.belanja, x.poin, x.alasan, prof(x.olehId).nama, x.waktu])],
       fee: [['Penerima', 'Jenis', 'Kegiatan', 'Nominal', 'Tanggal', 'Dibayar'], db.fee.map((f) => [prof(f.userId).nama, f.jenis, f.kegiatan, f.nominal, f.tanggal, f.lunas ? 'Ya' : 'Belum'])],
     }[k];
@@ -1411,6 +1471,15 @@ const FORM = {
       render();
     } catch (e) { btn.disabled = false; btn.textContent = baru ? 'Tambah anggota' : 'Simpan perubahan'; err(Kasir._pesan(e)); }
   },
+  bayarSewa: async (f) => {
+    const b = RK().find((x) => x.id === f.id.value); const n = parseInt(f.dibayar.value, 10); const jaminan = f.jaminan.value.trim();
+    if (!b || !Number.isInteger(n) || n < 0 || n > b.total) { toast(`Isi angka 0 sampai ${rp(b?.total)}`, 'coral'); return; }
+    const ket = [n !== (b.dibayar || 0) ? `dibayar ${rp(b.dibayar || 0)} → ${rp(n)}${n >= b.total ? ' (lunas)' : ''}` : '', jaminan !== (b.jaminan || '') ? (jaminan ? `jaminan: ${jaminan}` : 'jaminan dikembalikan') : ''].filter(Boolean).join(', ');
+    if (!isLive()) { Object.assign(b, { dibayar: n, jaminan }); commit('Pembayaran tersimpan', 'mint', 'rental', `Booking ${b.penyewa}: ${ket || 'tanpa perubahan'}`); return; }
+    $('#byBtn').disabled = true;
+    try { const ok = await Kasir.ubahBooking(b, { dibayar: n, jaminan }, `Booking ${b.penyewa}: ${ket}`); closeModal(); toast(ok ? 'Pembayaran & jaminan tersimpan' : 'Tidak ada yang berubah', 'mint'); render(); }
+    catch (e) { $('#byBtn').disabled = false; toast(Kasir._pesan(e), 'coral'); }
+  },
   tarik: async (f) => {
     const n = parseInt(f.nominal.value, 10); const g = Kasir.gajiSaya; const btn = $('#tarikBtn');
     if (!Number.isInteger(n) || n < Kasir.MIN_TARIK) { toast(`Minimal penarikan ${rp(Kasir.MIN_TARIK)}`, 'coral'); return; }
@@ -1436,10 +1505,21 @@ const FORM = {
     catch (e) { btn.disabled = false; $('#jdMsg').innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir._pesan(e))}</span></div>`; }
   },
   lupa: (f) => { closeModal(); toast(`Tautan atur ulang dikirim ke ${esc(f.email.value)} (simulasi)`, 'sky'); },
-  booking: (f) => {
+  booking: async (f) => {
     previewBooking(); if ($('#bkSubmit').disabled) return;
+    if (isLive()) {
+      const item = barangDari(f.barangId.value); const unit = parseInt(f.unit.value, 10);
+      const d = { penyewa: f.penyewa.value.trim(), wa: f.wa.value.trim(), barangId: item.id, unit, ambil: f.ambil.value, kembali: f.kembali.value, status: f.status.value, total: hitungBiaya(item, f.ambil.value, f.kembali.value, unit), dibayar: parseInt(f.dibayar.value || '0', 10) || 0, jaminan: f.jaminan.value.trim() };
+      if (d.penyewa.length < 2) { toast('Isi nama penyewa', 'coral'); return; }
+      const btn = $('#bkSubmit'); btn.disabled = true; btn.textContent = 'Menyimpan…';
+      try {
+        await Kasir.buatBooking(d, `Booking baru: ${d.penyewa}, ${item.nama} ×${unit}, ${tgl(d.ambil)} → ${tgl(d.kembali)} (${rp(d.total)}${d.dibayar ? ', dibayar ' + rp(d.dibayar) : ''})`);
+        ui.rentalItem = item.id; ui.calMonth = d.ambil.slice(0, 7); closeModal(); toast(`Booking ${esc(d.penyewa)} tersimpan · ${rp(d.total)}`, 'tangerine'); render();
+      } catch (e) { btn.disabled = false; btn.textContent = 'Simpan booking'; toast(Kasir._pesan(e), 'coral'); }
+      return;
+    }
     const item = db.barangSewa.find((b) => b.id === f.barangId.value); const unit = parseInt(f.unit.value, 10);
-    const b = { id: uid('bk'), penyewa: f.penyewa.value.trim(), wa: f.wa.value.trim(), barangId: item.id, unit, ambil: f.ambil.value, kembali: f.kembali.value, total: hitungBiaya(item, f.ambil.value, f.kembali.value, unit), status: f.status.value, olehId: meId, waktu: nowIso() };
+    const b = { id: uid('bk'), penyewa: f.penyewa.value.trim(), wa: f.wa.value.trim(), barangId: item.id, unit, ambil: f.ambil.value, kembali: f.kembali.value, total: hitungBiaya(item, f.ambil.value, f.kembali.value, unit), status: f.status.value, dibayar: parseInt(f.dibayar.value || '0', 10) || 0, jaminan: f.jaminan.value.trim(), olehId: meId, waktu: nowIso() };
     db.booking.push(b); ui.rentalItem = item.id; ui.calMonth = b.ambil.slice(0, 7);
     commit(`Booking ${esc(b.penyewa)} tersimpan · ${rp(b.total)}`, 'tangerine', 'rental', `Booking baru: ${b.penyewa}, ${item.nama} ×${unit}, ${b.ambil} → ${b.kembali} (${rp(b.total)})`);
   },
@@ -1466,8 +1546,18 @@ const FORM = {
     ui.stokTab = 'riwayat';
     commit(n ? `Opname tersimpan, ${n} barang disesuaikan` : 'Opname tersimpan, semua cocok', 'grape', 'stok', `Stock opname: ${n} barang disesuaikan`);
   },
-  sewa: (f) => {
+  sewa: async (f) => {
     const data = { nama: f.nama.value.trim(), spek: f.spek.value.trim(), unit: +f.unit.value, batasHari: +f.batasHari.value, harga24: +f.harga24.value, harga2: +f.harga2.value };
+    if (isLive()) {
+      const ints = ['unit', 'batasHari', 'harga24', 'harga2'];
+      if (data.nama.length < 2 || ints.some((k) => !Number.isInteger(data[k]) || data[k] < 0) || data.unit < 1 || data.batasHari < 1) { toast('Periksa lagi isian barang (angka bulat, unit dan batas hari minimal 1).', 'coral'); return; }
+      const lama = f.id.value ? RB().find((x) => x.id === f.id.value) : null;
+      data.aktif = f.aktif ? f.aktif.checked : true;
+      data.warna = lama?.warna || AV_COLORS[RB().length % AV_COLORS.length];
+      try { const ok = await Kasir.simpanBarangSewa(data, lama?.id); closeModal(); toast(!ok ? 'Tidak ada yang berubah' : lama ? 'Barang sewa diperbarui' : `${esc(data.nama)} ditambahkan`, 'tangerine'); render(); }
+      catch (e) { toast(Kasir._pesan(e), 'coral'); }
+      return;
+    }
     if (f.id.value) { Object.assign(db.barangSewa.find((x) => x.id === f.id.value), data); commit('Barang sewa diperbarui', 'tangerine', 'rental', `Ubah barang sewa ${data.nama}`); }
     else { const warna = AV_COLORS[db.barangSewa.length % AV_COLORS.length]; db.barangSewa.push({ id: uid('r'), warna, ...data }); commit(`${esc(data.nama)} ditambahkan`, 'tangerine', 'rental', `Barang sewa baru ${data.nama}`); }
   },
@@ -1555,8 +1645,9 @@ window.addEventListener('hashchange', () => { closeModal(); render(); window.scr
   const t = Store.getPref('theme', ''); if (t) document.documentElement.dataset.theme = t;
   if (meId === '') meId = null;
   Kasir.onChange = () => {
+    if (location.hash === '#sewa') { if (!$('#modalBack')) render(); return; }
     if (isLive() && !Kasir.on) { if (!$('#loginForm')) render(); return; }
-    if (!me() || !['stok', 'dasbor', 'poin', 'anggota', 'akun', 'jejak', 'fee'].includes(ui.view) || $('#modalBack')) return;
+    if (!me() || !['stok', 'dasbor', 'poin', 'anggota', 'akun', 'jejak', 'fee', 'rental'].includes(ui.view) || $('#modalBack')) return;
     const a = document.activeElement;
     if (a && a.matches('input, select, textarea') && $('#main')?.contains(a)) { if ($('#listStok')) $('#listStok').innerHTML = listStok(); if ($('#listAnggotaLive')) $('#listAnggotaLive').innerHTML = listAnggotaLive(); return; }
     render();
