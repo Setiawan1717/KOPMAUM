@@ -31,6 +31,15 @@ Semua migrasi sudah terpasang di project kopma-um.
    ```
 3. Peran Kopma Hub dan role kasir diatur di tabel `akun` (kolom `role`: admin/kasir/anggota, kolom `hub`: daftar peran). Ketua/sekretaris juga bisa mengatur `hub` dari Kopma Hub.
 
+## Kopma Hub versi Supabase (Tahap 2)
+
+`js/kasir.js` di branch kerja sudah memakai Supabase (bentuk objek `Kasir` sama, tampilan tidak berubah). **Belum digabung ke `main`**: situs yang dipakai pengurus tetap memakai Firebase sampai hari pindah, karena data asli masih di Firebase.
+
+- Halaman langsung tampil setelah akun terbaca; data tiap bagian menyusul (tidak menunggu semuanya).
+- Poin, gaji, saldo, dan laporan diambil sebagai hasil hitungan server.
+- Data diperbarui tiap 60 detik, saat tab dibuka lagi, dan langsung setelah menyimpan.
+- Diuji di project asli dengan akun uji `uji_*` (51 cek alur browser: penjualan & stok, gaji & penarikan + WA, rumus poin, anggota & peran, jejak, jadwal, rental, halaman publik, pendaftaran). Akun & produk uji dihapus sebelum hari pindah.
+
 ## Uji
 
 Skema diuji di Postgres lokal yang meniru Supabase (127 kasus: hak akses tiap peran, penjualan & stok, poin, gaji & penarikan, jadwal, rental, jejak) sebelum dipasang.
