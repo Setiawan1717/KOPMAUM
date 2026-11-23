@@ -1,6 +1,6 @@
 # Aturan keamanan Firestore (project kopma-um)
 
-`firestore.rules` mengunci database web kasir supaya aman dipakai bersama Kopma Hub. Aturan ini disusun dari semua operasi yang ada di kode web kasir, dan sudah diuji di Firestore Emulator: 20 alur kasir tetap jalan dan 17 percobaan penyalahgunaan ditolak. Aturan koleksi `anggota` diuji terpisah (19 kasus), begitu juga pendaftaran dengan kode, perbarui data sendiri, dan pengaturan peran (38 kasus). Rumus poin bersama diuji 31 kasus, ditambah uji alur di browser. Web kasir versi perbaikan juga sudah diuji ujung ke ujung (login, jualan dengan NIA, stok berkurang) terhadap aturan ini.
+`firestore.rules` mengunci database web kasir supaya aman dipakai bersama Kopma Hub. Aturan ini disusun dari semua operasi yang ada di kode web kasir, dan sudah diuji di Firestore Emulator: 20 alur kasir tetap jalan dan 17 percobaan penyalahgunaan ditolak. Aturan koleksi `anggota` diuji terpisah (19 kasus), begitu juga pendaftaran dengan kode, perbarui data sendiri, dan pengaturan peran (38 kasus). Rumus poin bersama dan jejak wajib diuji 44 kasus, ditambah uji alur di browser. Web kasir versi perbaikan juga sudah diuji ujung ke ujung (login, jualan dengan NIA, stok berkurang) terhadap aturan ini.
 
 ## Masalah yang ditutup
 
@@ -60,6 +60,19 @@ Rumus poin (1 poin setiap berapa rupiah belanja) disimpan di dokumen `pengaturan
 - Dibaca: semua akun terdaftar (poin anggota dihitung dari rumus ini).
 - Diubah: hanya ketua, bendahara, atau admin kasir, dengan angka bulat antara 100 dan 1.000.000 rupiah. Nama pengubah dan waktunya (waktu server) ikut tercatat dan tidak bisa dipalsukan.
 - Tidak bisa dihapus dari Kopma Hub. Dokumen `pengaturan/pendaftaran` (kode daftar) tetap tidak bisa dibaca siapa pun.
+
+## Jejak perubahan (wajib)
+
+Setiap perubahan yang dikirim Kopma Hub ke `anggota`, `users` (peran, penghubungan NIA, pendaftaran), dan `pengaturan/poin` wajib ditulis bersama satu catatan baru di koleksi `jejak`, dalam satu batch. Aturan Firestore memeriksa bahwa:
+
+- dokumen yang diubah menyimpan `jejakId` yang menunjuk catatan **baru** (catatan lama tidak bisa dipakai ulang);
+- catatan dibuat oleh akun yang sama, dengan nama pengguna dan waktu server yang tidak bisa dipalsukan;
+- setiap kolom yang berubah sudah disebut di catatan (misalnya tidak bisa mengganti nama diam-diam sambil menulis "ubah WA");
+- catatan tidak bisa dibuat tanpa perubahan sungguhan, dan tidak bisa diubah atau dihapus siapa pun dari aplikasi.
+
+Yang bisa membaca: ketua, sekretaris, bendahara, dan admin kasir. Perubahan oleh admin kasir dari web kasir dan dari Firebase Console tidak tercatat, karena tidak lewat Kopma Hub.
+
+**Penting saat memasang:** aturan baru dan kode Kopma Hub baru harus dipasang berdekatan. Kode lama ditolak oleh aturan baru (karena tidak menulis jejak), dan kode baru ditolak oleh aturan lama. Publish aturan setelah GitHub Pages selesai memperbarui situs (sekitar 1 menit setelah push), lalu minta pengurus memuat ulang Kopma Hub.
 
 ## Membuat akun kasir baru
 

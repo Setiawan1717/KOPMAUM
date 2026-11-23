@@ -108,6 +108,7 @@ const can = {
 ['akunView', 'akunEdit', 'anggotaView', 'anggotaFull', 'anggotaEdit', 'rentalView', 'rentalEdit', 'inventarisEdit', 'poinAdd', 'poinKoreksi', 'feeEdit', 'feeAll', 'jejak']
   .forEach((k) => { const f = can[k]; can[k] = () => !isLive() && f(); });
 can.anggotaLiveView = () => isLive() && (has('ketua', 'sekretaris', 'bendahara') || Kasir.akun?.role === 'admin');
+can.jejakLive = () => isLive() && (has('ketua', 'sekretaris', 'bendahara') || Kasir.akun?.role === 'admin');
 can.anggotaLiveEdit = () => isLive() && has('ketua', 'sekretaris');
 const stokTersedia = () => can.stokView() && (!isLive() || Kasir.aksesKasir);
 const rpPerPoin = () => (Kasir.on ? Kasir.rpPerPoin : db.pengaturan.rpPerPoin);
@@ -159,7 +160,7 @@ const NAV = [
   { id: 'poin', label: 'Poin', icon: 'star', color: 'grape', show: () => poinTersedia() },
   { id: 'fee', label: 'Fee & gaji', icon: 'wallet', color: 'pink', show: () => !isLive() },
   { id: 'akun', label: 'Akun & peran', icon: 'shield', color: 'mint', show: () => (isLive() ? Kasir.kelolaAkun : can.akunView()) },
-  { id: 'jejak', label: 'Jejak', icon: 'history', color: 'coral', show: () => can.jejak() },
+  { id: 'jejak', label: 'Jejak', icon: 'history', color: 'coral', show: () => can.jejak() || can.jejakLive() },
 ];
 const navLabel = (n) => (n.labelFn ? n.labelFn() : n.label);
 
@@ -857,7 +858,19 @@ function viewAkun() {
 }
 
 /* ---------- Jejak ---------- */
+function viewJejakLive() {
+  const MOD = { semua: ['Semua', 'coral'], anggota: ['Anggota', 'sky'], akun: ['Akun', 'mint'], poin: ['Poin', 'grape'] };
+  if (!MOD[ui.jejakModul]) ui.jejakModul = 'semua';
+  const nama = (u) => Kasir.akunList.find((a) => a.username === u)?.nama || u;
+  const rows = Kasir.jejak.filter((l) => ui.jejakModul === 'semua' || l.modul === ui.jejakModul);
+  return `${pageHead('Jejak perubahan', 'Setiap perubahan data anggota, peran akun, dan rumus poin tercatat otomatis: siapa, apa, dan kapan. Catatan tidak bisa diubah atau dihapus.')}
+  ${Kasir.jejakError ? `<div class="notice c-coral">${ic('alert')}<span>Jejak gagal dimuat: ${esc(Kasir.jejakError)}</span></div>` : ''}
+  <div class="chips">${Object.entries(MOD).map(([k, [l, c]]) => `<button class="chip c-${c} ${ui.jejakModul === k ? 'on' : ''}" data-act="jejak-mod" data-k="${k}">${l}</button>`).join('')}</div>
+  <div class="list">${rows.length ? rows.map((l) => `<div class="row"><span class="stripe c-${MOD[l.modul]?.[1] || 'coral'}"></span>${avatar({ id: l.oleh || 'x', nama: nama(l.oleh) || '?' }, 32)}<div class="grow"><div style="font-weight:600">${esc(l.aksi)}</div><div class="sub">${esc(nama(l.oleh) || 'tidak dikenal')} · ${l.waktu ? waktu(l.waktu) : 'baru saja'}</div></div><span class="pill c-${MOD[l.modul]?.[1] || 'coral'}">${MOD[l.modul]?.[0] || esc(l.modul)}</span></div>`).join('') : empty('history', 'Belum ada perubahan tercatat. Perubahan data anggota, peran, dan rumus poin akan muncul di sini.')}</div>
+  ${Kasir.jejak.length >= 300 ? '<p class="small muted">Menampilkan 300 perubahan terakhir.</p>' : ''}`;
+}
 function viewJejak() {
+  if (isLive()) return viewJejakLive();
   const MOD = { semua: ['Semua', 'coral'], akun: ['Akun', 'mint'], anggota: ['Anggota', 'sky'], stok: ['Stok', 'lime'], rental: ['Rental', 'tangerine'], poin: ['Poin', 'grape'], fee: ['Fee', 'pink'] };
   const rows = db.log.filter((l) => ui.jejakModul === 'semua' || l.modul === ui.jejakModul);
   return `${pageHead('Jejak perubahan', 'Setiap perubahan stok, poin, booking, dan fee mencatat pelaku dan waktunya.')}
@@ -1255,7 +1268,9 @@ const FORM = {
   },
   peranLive: async (f) => {
     const hub = [...f.querySelectorAll('[name=peran]:checked')].map((i) => i.value); const btn = $('#plBtn'); btn.disabled = true; btn.textContent = 'Menyimpan…';
-    try { await Kasir.ubahPeran(f.uid.value, hub); closeModal(); toast('Peran diperbarui', 'mint'); render(); }
+    const u = Kasir.akunList.find((a) => a.uid === f.uid.value);
+    const aksi = `Peran ${u?.username || 'akun'}: ${hub.map((r) => ROLES[r]?.label || r).join(', ') || 'tanpa peran Kopma Hub'}`;
+    try { await Kasir.ubahPeran(f.uid.value, hub, aksi); closeModal(); toast('Peran diperbarui', 'mint'); render(); }
     catch (e) { btn.disabled = false; btn.textContent = 'Simpan peran'; $('#plMsg').innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir._pesan(e))}</span></div>`; }
   },
   anggotaLive: async (f) => {
@@ -1263,7 +1278,7 @@ const FORM = {
     if (f.sendiri.value === '1') {
       const data = { nia: normNia(f.nia.value), nama: f.nama.value.trim().replace(/\s+/g, ' '), fakultas: f.fakultas.value.trim(), prodi: f.prodi.value.trim(), angkatan: f.angkatan.value ? Number(f.angkatan.value) : null, wa: f.wa.value.trim() || null };
       const btn = $('#alSubmit'); btn.disabled = true; btn.textContent = 'Menyimpan…';
-      try { await Kasir.simpanAnggota(data, false); closeModal(); toast('Datamu diperbarui', 'sky'); render(); }
+      try { const ok = await Kasir.simpanAnggota(data, false); closeModal(); toast(ok ? 'Datamu diperbarui' : 'Tidak ada yang berubah', 'sky'); render(); }
       catch (e) { btn.disabled = false; btn.textContent = 'Simpan perubahan'; $('#alMsg').innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir._pesan(e))}</span></div>`; }
       return;
     }
@@ -1274,8 +1289,8 @@ const FORM = {
     if (!/^[A-Z0-9.\-\/]{3,20}$/.test(data.nia)) return err('NIA hanya boleh huruf, angka, titik, strip, atau garis miring (3-20 karakter).');
     const btn = $('#alSubmit'); btn.disabled = true; btn.textContent = 'Menyimpan…';
     try {
-      await Kasir.simpanAnggota(data, baru);
-      closeModal(); toast(baru ? `${esc(data.nama)} ditambahkan` : `Data ${esc(data.nama)} diperbarui`, 'sky');
+      const ok = await Kasir.simpanAnggota(data, baru);
+      closeModal(); toast(baru ? `${esc(data.nama)} ditambahkan` : ok ? `Data ${esc(data.nama)} diperbarui` : 'Tidak ada yang berubah', 'sky');
       if (baru) { ui.q.anggotaLive = ''; ui.anggotaLiveFilter = 'semua'; }
       render();
     } catch (e) { btn.disabled = false; btn.textContent = baru ? 'Tambah anggota' : 'Simpan perubahan'; err(Kasir._pesan(e)); }
@@ -1401,7 +1416,7 @@ window.addEventListener('hashchange', () => { closeModal(); render(); window.scr
   if (meId === '') meId = null;
   Kasir.onChange = () => {
     if (isLive() && !Kasir.on) { if (!$('#loginForm')) render(); return; }
-    if (!me() || !['stok', 'dasbor', 'poin', 'anggota', 'akun'].includes(ui.view) || $('#modalBack')) return;
+    if (!me() || !['stok', 'dasbor', 'poin', 'anggota', 'akun', 'jejak'].includes(ui.view) || $('#modalBack')) return;
     const a = document.activeElement;
     if (a && a.matches('input, select, textarea') && $('#main')?.contains(a)) { if ($('#listStok')) $('#listStok').innerHTML = listStok(); if ($('#listAnggotaLive')) $('#listAnggotaLive').innerHTML = listAnggotaLive(); return; }
     render();

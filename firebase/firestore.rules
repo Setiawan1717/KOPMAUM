@@ -4,7 +4,8 @@ rules_version = '2';
 // Disusun dari semua operasi baca/tulis yang ada di web kasir (KasirKopmaUM2026/index.html):
 //  - role "kasir": jualan (kurangi stok produk + buat transaksi)
 //  - role "admin": semua menu kasir (produk, barang masuk, riwayat, laporan, pengeluaran, modal harian)
-//  - Kopma Hub: membaca data kasir; ketua & sekretaris mengelola anggota dan peran; anggota mendaftar dengan kode
+//  - Kopma Hub: membaca data kasir; ketua & sekretaris mengelola anggota dan peran; anggota mendaftar dengan kode;
+//    setiap perubahan dari Kopma Hub wajib meninggalkan catatan di koleksi jejak
 // Semua yang tidak disebut di bawah otomatis DITOLAK.
 
 service cloud.firestore {
@@ -22,6 +23,22 @@ service cloud.firestore {
     // NIA yang diklaim akun ini dalam penulisan yang sama (batch) harus milik akun ini
     function klaimMilikku(nia) { return getAfter(/databases/$(database)/documents/klaim_nia/$(nia)).data.uid == request.auth.uid; }
     function bisaKlaim(nia) { return nia is string && nia.size() >= 3 && exists(/databases/$(database)/documents/anggota/$(nia)) && klaimMilikku(nia); }
+    // ---------- Jejak wajib ----------
+    // Setiap perubahan dari Kopma Hub ke anggota, users (peran/NIA/pendaftaran), dan pengaturan/poin harus menyimpan
+    // field jejakId yang menunjuk catatan BARU di koleksi jejak, ditulis dalam batch yang sama oleh akun yang sama
+    // dan untuk dokumen yang sama. Tanpa catatan itu, perubahannya ditolak.
+    function jejakDoc(id) { return /databases/$(database)/documents/jejak/$(id); }
+    function jejakBaru(target) {
+      let id = request.resource.data.get('jejakId', '');
+      return id is string && id.size() > 0 && !exists(jejakDoc(id))
+        && getAfter(jejakDoc(id)).data.uid == request.auth.uid
+        && getAfter(jejakDoc(id)).data.target == target;
+    }
+    // kolom yang berubah harus sudah disebut di catatan jejak (kecuali kolom pencatat)
+    function kolomTercatat() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(getAfter(jejakDoc(request.resource.data.jejakId)).data.kolom.concat(['jejakId', 'diubah', 'diubahOleh']));
+    }
     function perananHub() { return ['ketua', 'sekretaris', 'bendahara', 'bidang_usaha', 'petugas_jaga', 'pengurus']; }
 
     // ---------- Akun ----------
@@ -32,19 +49,22 @@ service cloud.firestore {
       allow read: if masuk() && (request.auth.uid == uid || admin() || punyaHub(['ketua', 'sekretaris']));
       allow create: if admin()
         || (masuk() && request.auth.uid == uid
-            && request.resource.data.keys().hasOnly(['username', 'role', 'nia', 'dibuat'])
+            && request.resource.data.keys().hasOnly(['username', 'role', 'nia', 'dibuat', 'jejakId'])
             && request.resource.data.role == 'anggota'
             && request.auth.token.email == request.resource.data.username + '@kopma.um'
             && existsAfter(/databases/$(database)/documents/bukti_daftar/$(uid))
-            && bisaKlaim(request.resource.data.nia));
+            && bisaKlaim(request.resource.data.nia)
+            && jejakBaru('users/' + uid));
       allow update: if admin()
         // ketua/sekretaris mengatur peran Kopma Hub orang lain (bukan dirinya sendiri, bukan role kasir)
         || (punyaHub(['ketua', 'sekretaris']) && request.auth.uid != uid
-            && berubahHanya(['hub'])
-            && request.resource.data.hub is list && request.resource.data.hub.hasOnly(perananHub()))
+            && berubahHanya(['hub', 'jejakId'])
+            && request.resource.data.hub is list && request.resource.data.hub.hasOnly(perananHub())
+            && jejakBaru('users/' + uid) && kolomTercatat())
         // akun lama (tanpa NIA) menghubungkan NIA-nya sendiri
         || (request.auth.uid == uid && resource.data.get('nia', '') == ''
-            && berubahHanya(['nia']) && bisaKlaim(request.resource.data.nia));
+            && berubahHanya(['nia', 'jejakId']) && bisaKlaim(request.resource.data.nia)
+            && jejakBaru('users/' + uid) && kolomTercatat());
       allow delete: if admin();
     }
 
@@ -78,7 +98,8 @@ service cloud.firestore {
     match /pengaturan/poin {
       allow read: if terdaftar();
       allow create, update: if (admin() || punyaHub(['ketua', 'bendahara']))
-        && request.resource.data.keys().hasOnly(['rpPerPoin', 'diubah', 'diubahOleh'])
+        && request.resource.data.keys().hasOnly(['rpPerPoin', 'diubah', 'diubahOleh', 'jejakId'])
+        && jejakBaru('pengaturan/poin')
         && request.resource.data.rpPerPoin is int
         && request.resource.data.rpPerPoin >= 100 && request.resource.data.rpPerPoin <= 1000000
         && request.resource.data.diubah == request.time
@@ -92,14 +113,35 @@ service cloud.firestore {
       allow read: if punyaHub(['ketua', 'sekretaris', 'bendahara']) || admin() || (niaSaya() != '' && niaSaya() == nia);
       // pemilik NIA memperbarui datanya sendiri (bukan status, bidang, atau NIA)
       allow update: if niaSaya() != '' && niaSaya() == nia
-        && berubahHanya(['nama', 'fakultas', 'prodi', 'angkatan', 'wa', 'diubah', 'diubahOleh'])
-        && request.resource.data.nama is string && request.resource.data.nama.size() >= 2;
+        && berubahHanya(['nama', 'fakultas', 'prodi', 'angkatan', 'wa', 'diubah', 'diubahOleh', 'jejakId'])
+        && request.resource.data.nama is string && request.resource.data.nama.size() >= 2
+        && jejakBaru('anggota/' + nia) && kolomTercatat();
       allow create, update: if punyaHub(['ketua', 'sekretaris'])
         && request.resource.data.nia == nia
-        && request.resource.data.keys().hasOnly(['nia', 'nama', 'fakultas', 'prodi', 'angkatan', 'wa', 'status', 'bidang', 'aktif', 'dibuat', 'dibuatOleh', 'diubah', 'diubahOleh'])
+        && request.resource.data.keys().hasOnly(['nia', 'nama', 'fakultas', 'prodi', 'angkatan', 'wa', 'status', 'bidang', 'aktif', 'dibuat', 'dibuatOleh', 'diubah', 'diubahOleh', 'jejakId'])
         && request.resource.data.nama is string && request.resource.data.nama.size() >= 2
-        && request.resource.data.status in ['anggota', 'pengurus'];
+        && request.resource.data.status in ['anggota', 'pengurus']
+        && jejakBaru('anggota/' + nia) && (resource == null || kolomTercatat());
       allow delete: if false;
+    }
+
+    // ---------- Jejak perubahan (Kopma Hub) ----------
+    // Catatan hanya bisa DITAMBAH, tidak bisa diubah atau dihapus siapa pun dari aplikasi.
+    // Catatan harus menempel pada perubahan sungguhan: dokumen targetnya, setelah batch selesai, menunjuk catatan ini.
+    match /jejak/{id} {
+      allow read: if punyaHub(['ketua', 'sekretaris', 'bendahara']) || admin();
+      allow create: if masuk()
+        && request.resource.data.keys().hasOnly(['modul', 'aksi', 'target', 'kolom', 'oleh', 'uid', 'waktu'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.oleh == getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.username
+        && request.resource.data.waktu == request.time
+        && request.resource.data.modul in ['anggota', 'akun', 'poin']
+        && request.resource.data.aksi is string && request.resource.data.aksi.size() >= 3 && request.resource.data.aksi.size() <= 300
+        && request.resource.data.kolom is list && request.resource.data.kolom.size() <= 20
+        && request.resource.data.target is string
+        && request.resource.data.target.matches('^(anggota|users)/[^/]+$|^pengaturan/poin$')
+        && getAfter(path('/databases/' + database + '/documents/' + request.resource.data.target)).data.get('jejakId', '') == id;
+      allow update, delete: if false;
     }
 
     // ---------- Produk ----------

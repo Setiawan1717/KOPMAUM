@@ -1,7 +1,8 @@
 /* Kopma Hub — sambungan ke Firebase project kopma-um (dipakai bersama web kasir).
    - Data kasir (products, transactions, pengeluaran, modal_harian): BACA SAJA.
    - Yang ditulis: data anggota (ketua/sekretaris, atau pemilik NIA untuk datanya sendiri), peran Kopma Hub
-     (ketua/sekretaris), rumus poin (ketua/bendahara, dokumen pengaturan/poin), dan pendaftaran akun dengan kode. Semua dibatasi aturan Firestore.
+     (ketua/sekretaris), rumus poin (ketua/bendahara, dokumen pengaturan/poin), dan pendaftaran akun dengan kode.
+   - Setiap tulisan di atas disertai satu catatan di koleksi jejak dalam batch yang sama (diwajibkan aturan Firestore). Semua dibatasi aturan Firestore.
    Aturan Firestore (firebase/firestore.rules) menolak tulisan lain apa pun yang dikirim dari sini. */
 
 const KASIR_FIREBASE_CONFIG = {
@@ -24,9 +25,10 @@ const Kasir = {
   products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '',
   rpPerPoin: 1000, rumusInfo: null, rumusError: '',   // rumus poin bersama dari pengaturan/poin (default Rp1.000)
   akun: null,           // dokumen users milik akun yang login: { uid, username, role, hub[], nama, nia }
-  anggota: [], anggotaError: '', anggotaSaya: null, akunList: [], akunError: '',
+  anggota: [], anggotaError: '', anggotaSaya: null, akunList: [], akunError: '', jejak: [], jejakError: '',
   get aksesKasir() { return ['admin', 'kasir'].includes(this.akun?.role); },
   get kelolaAkun() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'sekretaris'].includes(r)); },
+  get bacaJejak() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'sekretaris', 'bendahara'].includes(r)); },
   get bacaAnggota() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'sekretaris', 'bendahara'].includes(r)); },
   onChange: () => {},
   _fb: null, _unsubs: [],
@@ -61,7 +63,7 @@ const Kasir = {
     this._stop();
     const nia = this.akun?.nia || '';
     const poinSendiri = !this.aksesKasir && !!nia;
-    const perlu = 1 + (this.aksesKasir ? 4 : 0) + (this.bacaAnggota ? 1 : 0) + (nia && !this.bacaAnggota ? 1 : 0) + (poinSendiri ? 1 : 0) + (this.kelolaAkun ? 1 : 0);
+    const perlu = 1 + (this.aksesKasir ? 4 : 0) + (this.bacaAnggota ? 1 : 0) + (nia && !this.bacaAnggota ? 1 : 0) + (poinSendiri ? 1 : 0) + (this.kelolaAkun ? 1 : 0) + (this.bacaJejak ? 1 : 0);
     let siap = 0;
     const done = () => { siap++; if (siap >= perlu) this._set({ on: true, status: 'on' }); else this.onChange(); };
     const fail = (e) => { this._stop(); this._set({ on: false, status: 'error', error: this._pesan(e) }); };
@@ -94,6 +96,11 @@ const Kasir = {
     }
     if (poinSendiri) {                // poin sendiri: hanya transaksi dengan NIA miliknya
       this._unsubs.push(fs.onSnapshot(fs.query(fs.collection(db, 'transactions'), fs.where('niaAnggota', '==', nia)), ...lunak((s) => { this.trxAnggota = s.docs.map((d) => ({ id: d.id, ...d.data() })); }, 'poinError')));
+    }
+    if (this.bacaJejak) {
+      this._unsubs.push(fs.onSnapshot(fs.query(fs.collection(db, 'jejak'), fs.orderBy('waktu', 'desc'), fs.limit(300)), ...lunak((s) => {
+        this.jejak = s.docs.map((d) => { const x = d.data({ serverTimestamps: 'estimate' }); return { ...x, id: d.id, waktu: x.waktu?.toDate ? x.waktu.toDate().toISOString() : '' }; });
+      }, 'jejakError')));
     }
     if (this.kelolaAkun) {
       this._unsubs.push(fs.onSnapshot(fs.collection(db, 'users'), ...lunak((s) => {
@@ -146,7 +153,16 @@ const Kasir = {
     this._stop();
     Store.setPref('kasir', '');
     try { if (this._fb) await this._fb.auth.signOut(this._fb.authInst); } catch (e) { /* abaikan */ }
-    this._set({ on: false, status: 'off', products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '', rpPerPoin: 1000, rumusInfo: null, rumusError: '', email: '', akun: null, anggota: [], anggotaError: '', anggotaSaya: null, akunList: [], akunError: '' });
+    this._set({ on: false, status: 'off', products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '', rpPerPoin: 1000, rumusInfo: null, rumusError: '', email: '', akun: null, anggota: [], anggotaError: '', anggotaSaya: null, akunList: [], akunError: '', jejak: [], jejakError: '' });
+  },
+
+  // catatan jejak untuk satu perubahan; ditulis di batch/transaksi yang sama dengan perubahannya.
+  // Mengembalikan id catatan, yang harus disimpan sebagai field jejakId di dokumen target.
+  _jejak(w, { target, modul, aksi, kolom = [] }, username) {
+    const { fs, db } = this._fb;
+    const ref = fs.doc(fs.collection(db, 'jejak'));
+    w.set(ref, { modul, aksi: String(aksi).slice(0, 300), target, kolom, oleh: username ?? (this.akun?.username || ''), uid: this._fb.authInst.currentUser.uid, waktu: fs.serverTimestamp() });
+    return ref.id;
   },
 
   // daftar akun baru dengan kode pendaftaran (dicek aturan Firestore, bukan di sini)
@@ -162,7 +178,8 @@ const Kasir = {
       const uid = cred.user.uid; const b = fs.writeBatch(db);
       b.set(fs.doc(db, 'bukti_daftar', uid), { kode });
       b.set(fs.doc(db, 'klaim_nia', nia), { uid, dibuat: new Date().toISOString() });
-      b.set(fs.doc(db, 'users', uid), { username: user, role: 'anggota', nia, dibuat: new Date().toISOString() });
+      const jejakId = this._jejak(b, { target: 'users/' + uid, modul: 'akun', aksi: `Akun baru ${user} mendaftar dengan NIA ${nia}` }, user);
+      b.set(fs.doc(db, 'users', uid), { username: user, role: 'anggota', nia, dibuat: new Date().toISOString(), jejakId });
       await b.commit();
     } catch (e) {
       if (cred) { try { await auth.deleteUser(cred.user); } catch (x) { try { await auth.signOut(authInst); } catch (y) { /* abaikan */ } } }
@@ -180,7 +197,8 @@ const Kasir = {
     const { fs, db } = await this._load();
     const uid = this.akun.uid; const b = fs.writeBatch(db);
     b.set(fs.doc(db, 'klaim_nia', nia), { uid, dibuat: new Date().toISOString() });
-    b.update(fs.doc(db, 'users', uid), { nia });
+    const jejakId = this._jejak(b, { target: 'users/' + uid, modul: 'akun', aksi: `${this.akun.username} menghubungkan akunnya dengan NIA ${nia}`, kolom: ['nia'] });
+    b.update(fs.doc(db, 'users', uid), { nia, jejakId });
     try { await b.commit(); } catch (e) {
       if (String(e?.code || '').includes('permission-denied')) { const x = new Error('NIA itu belum ada di data anggota atau sudah dipakai akun lain.'); x.code = 'pesan'; throw x; }
       throw e;
@@ -189,15 +207,22 @@ const Kasir = {
   },
 
   // ketua/sekretaris mengatur peran Kopma Hub akun lain
-  async ubahPeran(uid, hub) {
+  async ubahPeran(uid, hub, aksi) {
     const { fs, db } = await this._load();
-    await fs.updateDoc(fs.doc(db, 'users', uid), { hub });
+    const b = fs.writeBatch(db);
+    const jejakId = this._jejak(b, { target: 'users/' + uid, modul: 'akun', aksi, kolom: ['hub'] });
+    b.update(fs.doc(db, 'users', uid), { hub, jejakId });
+    await b.commit();
   },
 
   // ketua/bendahara mengubah rumus poin bersama (1 poin setiap v rupiah)
   async simpanRumus(v) {
     const { fs, db } = await this._load();
-    await fs.setDoc(fs.doc(db, 'pengaturan', 'poin'), { rpPerPoin: v, diubah: fs.serverTimestamp(), diubahOleh: this.akun?.username || '' });
+    const rp = (n) => 'Rp' + Number(n).toLocaleString('id-ID');
+    const b = fs.writeBatch(db);
+    const jejakId = this._jejak(b, { target: 'pengaturan/poin', modul: 'poin', aksi: `Rumus poin ${rp(this.rpPerPoin)} → ${rp(v)} per poin`, kolom: ['rpPerPoin'] });
+    b.set(fs.doc(db, 'pengaturan', 'poin'), { rpPerPoin: v, diubah: fs.serverTimestamp(), diubahOleh: this.akun?.username || '', jejakId });
+    await b.commit();
   },
 
   // tambah / ubah data anggota (dokumen anggota/{NIA}); hanya berhasil untuk ketua & sekretaris
@@ -205,16 +230,28 @@ const Kasir = {
     const { fs, db } = await this._load();
     const ref = fs.doc(db, 'anggota', data.nia);
     const oleh = this.akun?.username || 'kopmahub';
-    if (baru) {
-      await fs.runTransaction(db, async (tx) => {
-        const ada = await tx.get(ref);
+    const target = 'anggota/' + data.nia;
+    // dibaca ulang di dalam transaksi supaya daftar kolom yang berubah selalu tepat
+    return fs.runTransaction(db, async (tx) => {
+      const ada = await tx.get(ref);
+      if (baru) {
         if (ada.exists()) { const e = new Error(`NIA ${data.nia} sudah terdaftar atas nama ${ada.data().nama}.`); e.code = 'nia-sudah-ada'; throw e; }
-        tx.set(ref, { ...data, aktif: true, dibuat: new Date().toISOString(), dibuatOleh: oleh });
-      });
-    } else {
+        const jejakId = this._jejak(tx, { target, modul: 'anggota', aksi: `Anggota baru ${data.nama} (${data.nia})` });
+        tx.set(ref, { ...data, aktif: true, dibuat: new Date().toISOString(), dibuatOleh: oleh, jejakId });
+        return true;
+      }
+      const lama = ada.exists() ? ada.data() : {};
       const { nia, ...ubah } = data;
-      await fs.updateDoc(ref, { ...ubah, diubah: new Date().toISOString(), diubahOleh: oleh });
-    }
+      const kolom = Object.keys(ubah).filter((k) => JSON.stringify(lama[k] ?? null) !== JSON.stringify(ubah[k] ?? null));
+      if (!kolom.length) return false;   // tidak ada yang berubah, tidak perlu menulis
+      const NAMA = { nama: 'nama', fakultas: 'fakultas', prodi: 'prodi', angkatan: 'angkatan', wa: 'WA', status: 'status', bidang: 'bidang', aktif: 'status aktif' };
+      const siapa = this.akun?.nia === nia ? `${oleh} memperbarui datanya sendiri` : `Ubah data ${ubah.nama || lama.nama} (${nia})`;
+      const ket = kolom.map((k) => (k === 'aktif' ? (ubah.aktif ? 'diaktifkan' : 'dinonaktifkan') : k === 'status' ? `status ${lama.status || '-'} → ${ubah.status}` : NAMA[k] || k)).join(', ');
+      const jejakId = this._jejak(tx, { target, modul: 'anggota', aksi: `${siapa}: ${ket}`, kolom });
+      const isi = {}; kolom.forEach((k) => { isi[k] = ubah[k] ?? null; });
+      tx.update(ref, { ...isi, diubah: new Date().toISOString(), diubahOleh: oleh, jejakId });
+      return true;
+    });
   },
 
   // cadangan lengkap (baca saja) — seluruh isi koleksi kasir sebagai JSON

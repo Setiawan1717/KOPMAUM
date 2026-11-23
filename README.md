@@ -37,7 +37,8 @@ Halaman masuk Kopma Hub memakai **akun Kopma** (akun Firebase yang sama dengan w
 - **Ketua dan sekretaris** bisa menambah dan mengubah. Bendahara dan admin kasir hanya melihat. NIA tidak bisa ganda dan data tidak bisa dihapus (cukup ditandai tidak aktif).
 - Poin dari kasir otomatis tampil dengan nama anggota.
 - **Rumus poin** disimpan di Firestore (`pengaturan/poin`), sama di semua perangkat. Ketua, bendahara, dan admin kasir bisa mengubahnya di halaman Poin.
-- Selama memakai akun sungguhan, modul yang datanya belum di Firebase (rental, fee, akun & peran, jejak) disembunyikan supaya tidak tercampur data contoh.
+- Selama memakai akun sungguhan, modul yang datanya belum di Firebase (rental dan fee) disembunyikan supaya tidak tercampur data contoh.
+- **Jejak**: setiap perubahan data anggota, peran akun, pendaftaran, dan rumus poin otomatis tercatat (siapa, apa, kapan) di koleksi `jejak`. Bisa dilihat ketua, sekretaris, bendahara, dan admin kasir. Catatan tidak bisa diubah atau dihapus.
 - **Daftar akun sendiri** di halaman masuk dengan kode pendaftaran (kodenya disimpan di Firestore, bukan di repo) dan NIA yang sudah terdaftar.
 - **Profil saya**: setiap orang memperbarui datanya sendiri dan melihat poinnya.
 - **Akun & peran**: ketua dan sekretaris mengatur peran akun lain langsung dari Kopma Hub.
