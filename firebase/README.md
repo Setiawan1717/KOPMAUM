@@ -14,6 +14,10 @@ Di web kasir, pendaftaran akun baru dijaga PIN yang ditulis langsung di kode. Re
 | Ketua / sekretaris (Kopma Hub) | Melihat, menambah, dan mengubah data anggota | Menghapus anggota, membaca data kasir (kecuali akunnya juga admin/kasir) |
 | Kopma Hub lainnya | Membaca sesuai peran | Menulis |
 
+## Peran Kopma Hub di dokumen `users`
+
+Field `hub` sebaiknya berupa **array** (contoh `["ketua"]`), tetapi teks biasa (`ketua` atau `Ketua`) juga dibaca, baik oleh aplikasi maupun aturan Firestore.
+
 ## Cara memasang
 
 > **Urutan ini penting.** Web kasir versi lama mengambil data *sebelum* login. Dengan aturan baru, permintaan itu ditolak dan daftar produk kosong. Jadi **perbarui web kasir dulu** (cabang `perbaikan-kopmahub` di repo kasir), baru pasang aturan ini.
@@ -55,20 +59,22 @@ Akun anggota/pengurus hasil pendaftaran **tidak bisa** dipakai di web kasir.
 
 ## Rumus poin bersama
 
-Rumus poin (1 poin setiap berapa rupiah belanja) disimpan di dokumen `pengaturan/poin`, jadi semua HP dan laptop memakai angka yang sama. Dokumen ini dibuat otomatis saat ketua, bendahara, atau admin kasir pertama kali menekan **Simpan rumus** di halaman Poin. Sebelum ada dokumennya, Kopma Hub memakai Rp1.000.
+Rumus poin (1 poin setiap berapa rupiah belanja, minimal Rp1) disimpan di dokumen `pengaturan/poin`, jadi semua HP dan laptop memakai angka yang sama. Dokumen ini dibuat otomatis saat ketua, bendahara, atau admin kasir pertama kali menekan **Simpan rumus** di halaman Poin. Sebelum ada dokumennya, Kopma Hub memakai Rp1.000.
 
 - Dibaca: semua akun terdaftar (poin anggota dihitung dari rumus ini).
-- Diubah: hanya ketua, bendahara, atau admin kasir, dengan angka bulat antara 100 dan 1.000.000 rupiah. Nama pengubah dan waktunya (waktu server) ikut tercatat dan tidak bisa dipalsukan.
+- Diubah: hanya ketua, bendahara, atau admin kasir, dengan angka bulat antara 1 dan 1.000.000 rupiah. Nama pengubah dan waktunya (waktu server) ikut tercatat dan tidak bisa dipalsukan.
 - Tidak bisa dihapus dari Kopma Hub. Dokumen `pengaturan/pendaftaran` (kode daftar) tetap tidak bisa dibaca siapa pun.
 
 ## Jejak perubahan (wajib)
 
-Setiap perubahan yang dikirim Kopma Hub ke `anggota`, `users` (peran, penghubungan NIA, pendaftaran), dan `pengaturan/poin` wajib ditulis bersama satu catatan baru di koleksi `jejak`, dalam satu batch. Aturan Firestore memeriksa bahwa:
+Setiap perubahan yang dikirim Kopma Hub ke `anggota`, `users` (peran), pengaturan (rumus poin, nomor WA bendahara), jadwal, penarikan gaji, dan rental wajib ditulis bersama satu catatan baru di koleksi `jejak`, dalam satu batch. Aturan Firestore memeriksa bahwa:
 
 - dokumen yang diubah menyimpan `jejakId` yang menunjuk catatan **baru** (catatan lama tidak bisa dipakai ulang);
 - catatan dibuat oleh akun yang sama, dengan nama pengguna dan waktu server yang tidak bisa dipalsukan;
 - setiap kolom yang berubah sudah disebut di catatan (misalnya tidak bisa mengganti nama diam-diam sambil menulis "ubah WA");
 - catatan tidak bisa dibuat tanpa perubahan sungguhan, dan tidak bisa diubah atau dihapus siapa pun dari aplikasi.
+
+Catatan berisi siapa yang mengubah, nilai sebelum → sesudah, dan waktunya. Pendaftaran akun dan penghubungan NIA tidak dicatat karena bukan perubahan data.
 
 Yang bisa membaca: ketua, sekretaris, bendahara, dan admin kasir. Perubahan oleh admin kasir dari web kasir dan dari Firebase Console tidak tercatat, karena tidak lewat Kopma Hub.
 
@@ -82,7 +88,8 @@ Yang bisa membaca: ketua, sekretaris, bendahara, dan admin kasir. Perubahan oleh
 - **`penarikan_gaji`**: petugas mengajukan atas namanya sendiri (bilangan bulat Rp10.000 sampai Rp5.000.000, status awal `diajukan`). Ketua, bendahara, atau admin mengubahnya menjadi `dibayar` atau `ditolak`, tetapi tidak untuk penarikannya sendiri. Pemilik bisa membatalkan selama masih `diajukan`. Penarikan yang sudah diproses tidak bisa diubah lagi atau dihapus.
 - Aturan Firestore tidak bisa menjumlah saldo, jadi kecukupan saldo dicek aplikasi saat mengajukan, dan dicek ulang dari transaksi saat ketua/bendahara menekan **Proses**.
 - **Daftar akun** (`users`) kini juga bisa dibaca bendahara dan bidang usaha, untuk memilih petugas di jadwal dan menampilkan nama. Mengubah peran tetap hanya ketua dan sekretaris.
-- Semua perubahan jadwal dan penarikan tercatat di Jejak.
+- **Nomor WA bendahara** disimpan di `pengaturan/kontak` (format 62…), diisi ketua/bendahara di Gaji jaga → Penarikan, dibaca akun terdaftar. Setelah petugas mengajukan penarikan, muncul tombol yang membuka WhatsApp ke nomor itu dengan pesan berisi nama, nominal, saldo, dan kode pengajuan.
+- Semua perubahan jadwal, penarikan, dan nomor WA tercatat di Jejak.
 
 ## Kopma Rental
 

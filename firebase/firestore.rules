@@ -17,7 +17,9 @@ service cloud.firestore {
     function admin() { return terdaftar() && akun().role == 'admin'; }
     function petugas() { return terdaftar() && akun().role in ['admin', 'kasir']; }
     // peran di Kopma Hub disimpan di field "hub" (daftar) pada dokumen users, contoh: ["ketua"]
-    function punyaHub(daftar) { return terdaftar() && akun().get('hub', []).hasAny(daftar); }
+    // hub biasanya daftar (["ketua"]); kalau diketik sebagai teks biasa di Console ("ketua") tetap dibaca
+    function hubSaya() { let h = akun().get('hub', []); return h is list ? h : (h is string ? [h.lower().trim()] : []); }
+    function punyaHub(daftar) { return terdaftar() && hubSaya().hasAny(daftar); }
     function niaSaya() { return terdaftar() ? akun().get('nia', '') : ''; }
     function berubahHanya(kolom) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(kolom); }
     // NIA yang diklaim akun ini dalam penulisan yang sama (batch) harus milik akun ini
@@ -53,8 +55,7 @@ service cloud.firestore {
             && request.resource.data.role == 'anggota'
             && request.auth.token.email == request.resource.data.username + '@kopma.um'
             && existsAfter(/databases/$(database)/documents/bukti_daftar/$(uid))
-            && bisaKlaim(request.resource.data.nia)
-            && jejakBaru('users/' + uid));
+            && bisaKlaim(request.resource.data.nia));
       allow update: if admin()
         // ketua/sekretaris mengatur peran Kopma Hub orang lain (bukan dirinya sendiri, bukan role kasir)
         || (punyaHub(['ketua', 'sekretaris']) && request.auth.uid != uid
@@ -63,8 +64,7 @@ service cloud.firestore {
             && jejakBaru('users/' + uid) && kolomTercatat())
         // akun lama (tanpa NIA) menghubungkan NIA-nya sendiri
         || (request.auth.uid == uid && resource.data.get('nia', '') == ''
-            && berubahHanya(['nia', 'jejakId']) && bisaKlaim(request.resource.data.nia)
-            && jejakBaru('users/' + uid) && kolomTercatat());
+            && berubahHanya(['nia', 'jejakId']) && bisaKlaim(request.resource.data.nia));
       allow delete: if admin();
     }
 
@@ -101,9 +101,19 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['rpPerPoin', 'diubah', 'diubahOleh', 'jejakId'])
         && jejakBaru('pengaturan/poin')
         && request.resource.data.rpPerPoin is int
-        && request.resource.data.rpPerPoin >= 100 && request.resource.data.rpPerPoin <= 1000000
+        && request.resource.data.rpPerPoin >= 1 && request.resource.data.rpPerPoin <= 1000000
         && request.resource.data.diubah == request.time
         && request.resource.data.diubahOleh == akun().get('username', '');
+      allow delete: if false;
+    }
+
+    // Nomor WA bendahara untuk pengajuan tarik gaji. Dibaca akun terdaftar, diubah ketua/bendahara/admin.
+    match /pengaturan/kontak {
+      allow read: if terdaftar();
+      allow create, update: if (admin() || punyaHub(['ketua', 'bendahara']))
+        && request.resource.data.keys().hasOnly(['waBendahara', 'jejakId'])
+        && request.resource.data.waBendahara is string && request.resource.data.waBendahara.matches('^62[0-9]{8,13}$')
+        && jejakBaru('pengaturan/kontak') && (resource == null || kolomTercatat());
       allow delete: if false;
     }
 
@@ -139,7 +149,7 @@ service cloud.firestore {
         && request.resource.data.aksi is string && request.resource.data.aksi.size() >= 3 && request.resource.data.aksi.size() <= 300
         && request.resource.data.kolom is list && request.resource.data.kolom.size() <= 20
         && request.resource.data.target is string
-        && request.resource.data.target.matches('^(anggota|users|jadwal_jaga|penarikan_gaji|sewa_barang|sewa_booking)/[^/]+$|^pengaturan/poin$')
+        && request.resource.data.target.matches('^(anggota|users|jadwal_jaga|penarikan_gaji|sewa_barang|sewa_booking)/[^/]+$|^pengaturan/(poin|kontak)$')
         && getAfter(path('/databases/' + database + '/documents/' + request.resource.data.target)).data.get('jejakId', '') == id;
       allow update, delete: if false;
     }

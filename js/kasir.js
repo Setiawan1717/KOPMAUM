@@ -30,6 +30,7 @@ const Kasir = {
   jadwal: [], jadwalError: '', penarikan: [], penarikanError: '', trxGaji: [], gajiError: '',
   laporanBulan: '', trxLaporan: [], laporanError: '', laporanSiap: false, _unsubLaporan: null,
   // Kopma Rental: inventaris, booking lengkap (pengelola), salinan publik (tanpa login)
+  waBendahara: '', kontakError: '',
   sewaBarang: [], sewaBooking: [], sewaError: '', publik: { on: false, barang: [], jadwal: [], error: '' }, _unsubPublik: [],
   get aksesKasir() { return ['admin', 'kasir'].includes(this.akun?.role); },
   get kelolaAkun() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'sekretaris'].includes(r)); },
@@ -74,7 +75,7 @@ const Kasir = {
     this._stop();
     const nia = this.akun?.nia || '';
     const poinSendiri = !this.aksesKasir && !!nia;
-    const perlu = 1 + (this.aksesKasir ? 4 : 0) + (this.bacaAnggota ? 1 : 0) + (nia && !this.bacaAnggota ? 1 : 0) + (poinSendiri ? 1 : 0) + (this.bacaAkun ? 1 : 0) + (this.bacaJejak ? 1 : 0) + 2 + (this.akun?.username ? 1 : 0) + (this.kelolaSewa ? 2 : 0);
+    const perlu = 1 + (this.aksesKasir ? 4 : 0) + (this.bacaAnggota ? 1 : 0) + (nia && !this.bacaAnggota ? 1 : 0) + (poinSendiri ? 1 : 0) + (this.bacaAkun ? 1 : 0) + (this.bacaJejak ? 1 : 0) + 2 + (this.akun?.username ? 1 : 0) + (this.kelolaSewa ? 2 : 0) + 1;
     let siap = 0;
     const done = () => { siap++; if (siap >= perlu) this._set({ on: true, status: 'on' }); else this.onChange(); };
     const fail = (e) => { this._stop(); this._set({ on: false, status: 'error', error: this._pesan(e) }); };
@@ -85,7 +86,7 @@ const Kasir = {
     this._unsubs.push(fs.onSnapshot(fs.doc(db, 'pengaturan', 'poin'), ...lunak((d) => {
       const x = d.exists() ? d.data({ serverTimestamps: 'estimate' }) : {};
       const v = Number(x.rpPerPoin);
-      this.rpPerPoin = Number.isInteger(v) && v >= 100 ? v : 1000;
+      this.rpPerPoin = Number.isInteger(v) && v >= 1 ? v : 1000;
       this.rumusInfo = d.exists() ? { oleh: x.diubahOleh || '', waktu: x.diubah?.toDate ? x.diubah.toDate().toISOString() : '' } : null;
     }, 'rumusError')));
     if (this.aksesKasir) {
@@ -113,6 +114,8 @@ const Kasir = {
         this.jejak = s.docs.map((d) => { const x = d.data({ serverTimestamps: 'estimate' }); return { ...x, id: d.id, waktu: x.waktu?.toDate ? x.waktu.toDate().toISOString() : '' }; });
       }, 'jejakError')));
     }
+    // nomor WA bendahara (untuk pengajuan tarik gaji)
+    this._unsubs.push(fs.onSnapshot(fs.doc(db, 'pengaturan', 'kontak'), ...lunak((d) => { this.waBendahara = d.exists() ? String(d.data().waBendahara || '') : ''; }, 'kontakError')));
     // jadwal jaga: semua akun terdaftar
     this._unsubs.push(fs.onSnapshot(fs.collection(db, 'jadwal_jaga'), ...lunak((s) => {
       this.jadwal = s.docs.map((d) => ({ ...d.data(), tanggal: d.id })).sort((a, b) => a.tanggal.localeCompare(b.tanggal));
@@ -140,7 +143,7 @@ const Kasir = {
     }
     if (this.bacaAkun) {
       this._unsubs.push(fs.onSnapshot(fs.collection(db, 'users'), ...lunak((s) => {
-        this.akunList = s.docs.map((d) => ({ uid: d.id, ...d.data() })).sort((a, b) => String(a.username).localeCompare(String(b.username)));
+        this.akunList = s.docs.map((d) => { const x = d.data(); return { uid: d.id, ...x, hub: this._hub(x.hub) }; }).sort((a, b) => String(a.username).localeCompare(String(b.username)));
       }, 'akunError')));
     }
   },
@@ -150,8 +153,10 @@ const Kasir = {
     const snap = await fs.getDoc(fs.doc(db, 'users', user.uid));
     if (!snap.exists()) { const e = new Error('akun'); e.code = 'akun-belum-terdaftar'; throw e; }
     const d = snap.data();
-    this.akun = { uid: user.uid, username: d.username || user.email.split('@')[0], role: d.role || '', hub: Array.isArray(d.hub) ? d.hub : [], nama: d.nama || '', nia: d.nia ? String(d.nia).replace(/\s+/g, '').toUpperCase() : '' };
+    this.akun = { uid: user.uid, username: d.username || user.email.split('@')[0], role: d.role || '', hub: this._hub(d.hub), nama: d.nama || '', nia: d.nia ? String(d.nia).replace(/\s+/g, '').toUpperCase() : '' };
   },
+  // peran hub boleh tersimpan sebagai daftar atau teks biasa (diketik di Console)
+  _hub: (h) => (Array.isArray(h) ? h : typeof h === 'string' && h.trim() ? [h] : []).map((r) => String(r).trim().toLowerCase()),
   _stop() { this._stopLaporan(); this._unsubs.forEach((u) => { try { u(); } catch (e) { /* abaikan */ } }); this._unsubs = []; },
 
   async connect(email, pass) {
@@ -189,7 +194,7 @@ const Kasir = {
     this._stop();
     Store.setPref('kasir', '');
     try { if (this._fb) await this._fb.auth.signOut(this._fb.authInst); } catch (e) { /* abaikan */ }
-    this._set({ on: false, status: 'off', products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '', rpPerPoin: 1000, rumusInfo: null, rumusError: '', email: '', akun: null, anggota: [], anggotaError: '', anggotaSaya: null, akunList: [], akunError: '', jejak: [], jejakError: '', sewaBarang: [], sewaBooking: [], sewaError: '', jadwal: [], jadwalError: '', penarikan: [], penarikanError: '', trxGaji: [], gajiError: '', laporanBulan: '', trxLaporan: [], laporanError: '', laporanSiap: false });
+    this._set({ on: false, status: 'off', products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '', rpPerPoin: 1000, rumusInfo: null, rumusError: '', email: '', akun: null, anggota: [], anggotaError: '', anggotaSaya: null, akunList: [], akunError: '', jejak: [], jejakError: '', waBendahara: '', kontakError: '', sewaBarang: [], sewaBooking: [], sewaError: '', jadwal: [], jadwalError: '', penarikan: [], penarikanError: '', trxGaji: [], gajiError: '', laporanBulan: '', trxLaporan: [], laporanError: '', laporanSiap: false });
   },
 
   // catatan jejak untuk satu perubahan; ditulis di batch/transaksi yang sama dengan perubahannya.
@@ -242,12 +247,24 @@ const Kasir = {
     return s.docs.map((d) => ({ id: d.id, tanggal: d.data().tanggal, total: d.data().total, kasir: d.data().kasir }));
   },
   _rp: (n) => 'Rp' + Number(n || 0).toLocaleString('id-ID'),
+  // "label: lama → baru" untuk catatan jejak
+  _nilai(v) { if (v === null || v === undefined || v === '') return '—'; if (typeof v === 'boolean') return v ? 'ya' : 'tidak'; if (Array.isArray(v)) return v.length ? v.join(', ') : '—'; return String(v).slice(0, 60); },
+  _beda(lama, baru, kolom, NAMA = {}, fmt = {}) {
+    return kolom.map((k) => { const f = fmt[k] || ((x) => this._nilai(x)); return `${NAMA[k] || k}: ${f(lama?.[k])} → ${f(baru[k])}`; }).join('; ');
+  },
+  async simpanWaBendahara(wa) {
+    const { fs, db } = await this._load();
+    const b = fs.writeBatch(db);
+    const jejakId = this._jejak(b, { target: 'pengaturan/kontak', modul: 'gaji', aksi: `Nomor WA bendahara: ${this.waBendahara || '—'} → ${wa}`, kolom: this.waBendahara ? ['waBendahara'] : [] });
+    b.set(fs.doc(db, 'pengaturan', 'kontak'), { waBendahara: wa, jejakId });
+    await b.commit();
+  },
   async ajukanPenarikan(nominal) {
     const { fs, db } = await this._load();
     const b = fs.writeBatch(db); const ref = fs.doc(fs.collection(db, 'penarikan_gaji'));
     const jejakId = this._jejak(b, { target: 'penarikan_gaji/' + ref.id, modul: 'gaji', aksi: `${this.akun.username} mengajukan penarikan gaji ${this._rp(nominal)}` });
     b.set(ref, { uid: this.akun.uid, username: this.akun.username, nominal, status: 'diajukan', diajukan: fs.serverTimestamp(), jejakId });
-    await b.commit();
+    await b.commit(); return ref.id;
   },
   async prosesPenarikan(p, status, alasan = '') {
     const { fs, db } = await this._load();
@@ -266,7 +283,9 @@ const Kasir = {
       const baru = { petugas, catatan };
       const kolom = lama ? Object.keys(baru).filter((k) => JSON.stringify(lama[k] ?? (k === 'catatan' ? '' : [])) !== JSON.stringify(baru[k])) : [];
       if (lama && !kolom.length) return false;
-      const jejakId = this._jejak(tx, { target: 'jadwal_jaga/' + tanggal, modul: 'jadwal', aksi: `Jadwal jaga ${labelTgl || tanggal}: ${petugas.join(', ') || 'dikosongkan'}${catatan ? ' (' + catatan + ')' : ''}`, kolom });
+      const aksi = lama ? `Ubah jadwal jaga ${labelTgl || tanggal}: ${this._beda(lama, baru, kolom, { petugas: 'petugas', catatan: 'catatan' })}`
+        : `Jadwal jaga ${labelTgl || tanggal}: ${petugas.join(', ') || 'kosong'}${catatan ? ' (' + catatan + ')' : ''}`;
+      const jejakId = this._jejak(tx, { target: 'jadwal_jaga/' + tanggal, modul: 'jadwal', aksi, kolom });
       const isi = { tanggal, petugas, catatan, diubah: new Date().toISOString(), diubahOleh: this.akun.username, jejakId };
       if (lama) tx.update(ref, isi); else tx.set(ref, isi);
       return true;
@@ -296,7 +315,8 @@ const Kasir = {
       const kolom = lama ? Object.keys(data).filter((k) => JSON.stringify(lama[k] ?? null) !== JSON.stringify(data[k] ?? null)) : [];
       if (lama && !kolom.length) return false;
       const NAMA = { nama: 'nama', spek: 'spesifikasi', unit: 'unit', harga24: 'harga 24 jam', harga2: 'harga harian', batasHari: 'batas hari', warna: 'warna', aktif: 'status aktif' };
-      const aksi = lama ? `Ubah barang sewa ${data.nama}: ${kolom.map((k) => (k === 'aktif' ? (data.aktif ? 'diaktifkan' : 'dinonaktifkan') : k === 'unit' ? `unit ${lama.unit} → ${data.unit}` : k.startsWith('harga') ? `${NAMA[k]} ${this._rp(lama[k])} → ${this._rp(data[k])}` : NAMA[k] || k)).join(', ')}`
+      const rp = (x) => this._rp(x);
+      const aksi = lama ? `Ubah barang sewa ${lama.nama}: ${this._beda(lama, data, kolom, NAMA, { harga24: rp, harga2: rp, aktif: (x) => (x === false ? 'nonaktif' : 'aktif') })}`
         : `Barang sewa baru: ${data.nama} (${data.unit} unit, ${this._rp(data.harga24)}/24 jam)`;
       const jejakId = this._jejak(tx, { target: 'sewa_barang/' + ref.id, modul: 'rental', aksi, kolom });
       if (lama) { const isi = {}; kolom.forEach((k) => { isi[k] = data[k]; }); tx.update(ref, { ...isi, jejakId }); } else tx.set(ref, { ...data, jejakId });
@@ -336,8 +356,7 @@ const Kasir = {
       const uid = cred.user.uid; const b = fs.writeBatch(db);
       b.set(fs.doc(db, 'bukti_daftar', uid), { kode });
       b.set(fs.doc(db, 'klaim_nia', nia), { uid, dibuat: new Date().toISOString() });
-      const jejakId = this._jejak(b, { target: 'users/' + uid, modul: 'akun', aksi: `Akun baru ${user} mendaftar dengan NIA ${nia}` }, user);
-      b.set(fs.doc(db, 'users', uid), { username: user, role: 'anggota', nia, dibuat: new Date().toISOString(), jejakId });
+      b.set(fs.doc(db, 'users', uid), { username: user, role: 'anggota', nia, dibuat: new Date().toISOString() });
       await b.commit();
     } catch (e) {
       if (cred) { try { await auth.deleteUser(cred.user); } catch (x) { try { await auth.signOut(authInst); } catch (y) { /* abaikan */ } } }
@@ -355,8 +374,7 @@ const Kasir = {
     const { fs, db } = await this._load();
     const uid = this.akun.uid; const b = fs.writeBatch(db);
     b.set(fs.doc(db, 'klaim_nia', nia), { uid, dibuat: new Date().toISOString() });
-    const jejakId = this._jejak(b, { target: 'users/' + uid, modul: 'akun', aksi: `${this.akun.username} menghubungkan akunnya dengan NIA ${nia}`, kolom: ['nia'] });
-    b.update(fs.doc(db, 'users', uid), { nia, jejakId });
+    b.update(fs.doc(db, 'users', uid), { nia });
     try { await b.commit(); } catch (e) {
       if (String(e?.code || '').includes('permission-denied')) { const x = new Error('NIA itu belum ada di data anggota atau sudah dipakai akun lain.'); x.code = 'pesan'; throw x; }
       throw e;
@@ -400,13 +418,17 @@ const Kasir = {
       }
       const lama = ada.exists() ? ada.data() : {};
       const { nia, ...ubah } = data;
-      const kolom = Object.keys(ubah).filter((k) => JSON.stringify(lama[k] ?? null) !== JSON.stringify(ubah[k] ?? null));
+      const sama = (x, y) => JSON.stringify(x === '' || x === undefined ? null : x) === JSON.stringify(y === '' || y === undefined ? null : y);
+      const kolom = Object.keys(ubah).filter((k) => !sama(lama[k], ubah[k]));
       if (!kolom.length) return false;   // tidak ada yang berubah, tidak perlu menulis
+      // dokumen lama yang dibuat lewat Console kadang tanpa kolom nia: lengkapi sekalian (aturan mensyaratkannya untuk ketua/sekretaris)
+      const lengkapiNia = lama.nia !== nia && this.akun?.nia !== nia;
       const NAMA = { nama: 'nama', fakultas: 'fakultas', prodi: 'prodi', angkatan: 'angkatan', wa: 'WA', status: 'status', bidang: 'bidang', aktif: 'status aktif' };
       const siapa = this.akun?.nia === nia ? `${oleh} memperbarui datanya sendiri` : `Ubah data ${ubah.nama || lama.nama} (${nia})`;
-      const ket = kolom.map((k) => (k === 'aktif' ? (ubah.aktif ? 'diaktifkan' : 'dinonaktifkan') : k === 'status' ? `status ${lama.status || '-'} → ${ubah.status}` : NAMA[k] || k)).join(', ');
-      const jejakId = this._jejak(tx, { target, modul: 'anggota', aksi: `${siapa}: ${ket}`, kolom });
+      const ket = this._beda(lama, ubah, kolom, NAMA, { aktif: (x) => (x === false ? 'nonaktif' : 'aktif') });
+      const jejakId = this._jejak(tx, { target, modul: 'anggota', aksi: `${siapa}: ${ket}`, kolom: lengkapiNia ? [...kolom, 'nia'] : kolom });
       const isi = {}; kolom.forEach((k) => { isi[k] = ubah[k] ?? null; });
+      if (lengkapiNia) { isi.nia = nia; }
       tx.update(ref, { ...isi, diubah: new Date().toISOString(), diubahOleh: oleh, jejakId });
       return true;
     });
