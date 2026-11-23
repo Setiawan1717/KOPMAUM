@@ -1,6 +1,6 @@
 # Aturan keamanan Firestore (project kopma-um)
 
-`firestore.rules` mengunci database web kasir supaya aman dipakai bersama Kopma Hub. Aturan ini disusun dari semua operasi yang ada di kode web kasir, dan sudah diuji di Firestore Emulator: 20 alur kasir tetap jalan dan 17 percobaan penyalahgunaan ditolak. Aturan koleksi `anggota` diuji terpisah (19 kasus), begitu juga pendaftaran dengan kode, perbarui data sendiri, dan pengaturan peran (38 kasus). Web kasir versi perbaikan juga sudah diuji ujung ke ujung (login, jualan dengan NIA, stok berkurang) terhadap aturan ini.
+`firestore.rules` mengunci database web kasir supaya aman dipakai bersama Kopma Hub. Aturan ini disusun dari semua operasi yang ada di kode web kasir, dan sudah diuji di Firestore Emulator: 20 alur kasir tetap jalan dan 17 percobaan penyalahgunaan ditolak. Aturan koleksi `anggota` diuji terpisah (19 kasus), begitu juga pendaftaran dengan kode, perbarui data sendiri, dan pengaturan peran (38 kasus). Rumus poin bersama diuji 31 kasus, ditambah uji alur di browser. Web kasir versi perbaikan juga sudah diuji ujung ke ujung (login, jualan dengan NIA, stok berkurang) terhadap aturan ini.
 
 ## Masalah yang ditutup
 
@@ -46,12 +46,20 @@ Akun Kopma Hub sama dengan akun web kasir. Setelah langkah awal di bawah, semuan
 | Calon pengguna | **Daftar** di halaman masuk Kopma Hub dengan kode pendaftaran, NIA, nama pengguna, dan kata sandi. Syarat: kode benar, NIA sudah ada di data anggota, dan NIA belum dipakai akun lain. Akun baru selalu berperan *anggota*. |
 | Pemilik akun | **Profil saya → Perbarui data**: nama, fakultas, prodi, angkatan, nomor WA. Status dan bidang tidak bisa diubah sendiri. Melihat poin dari transaksi dengan NIA miliknya saja. |
 | Ketua & sekretaris | Menambah dan mengubah data semua anggota. **Akun & peran → Atur peran**: memberi peran ketua, sekretaris, bendahara, bidang usaha, petugas jaga, atau pengurus ke akun lain (tidak bisa ke diri sendiri). |
-| Bendahara | Melihat data anggota. |
+| Bendahara | Melihat data anggota. Mengubah **rumus poin** (bersama ketua dan admin kasir). |
 | Admin kasir | Tetap satu-satunya yang mengatur role kasir (`admin`/`kasir`) lewat Firebase Console. |
 
 Akun lama yang belum punya NIA (misalnya akun kasir) bisa menghubungkan NIA-nya sendiri di **Profil saya**. Satu NIA hanya bisa untuk satu akun; kalau ada yang salah klaim, admin bisa menghapus dokumennya di koleksi `klaim_nia`.
 
 Akun anggota/pengurus hasil pendaftaran **tidak bisa** dipakai di web kasir.
+
+## Rumus poin bersama
+
+Rumus poin (1 poin setiap berapa rupiah belanja) disimpan di dokumen `pengaturan/poin`, jadi semua HP dan laptop memakai angka yang sama. Dokumen ini dibuat otomatis saat ketua, bendahara, atau admin kasir pertama kali menekan **Simpan rumus** di halaman Poin. Sebelum ada dokumennya, Kopma Hub memakai Rp1.000.
+
+- Dibaca: semua akun terdaftar (poin anggota dihitung dari rumus ini).
+- Diubah: hanya ketua, bendahara, atau admin kasir, dengan angka bulat antara 100 dan 1.000.000 rupiah. Nama pengubah dan waktunya (waktu server) ikut tercatat dan tidak bisa dipalsukan.
+- Tidak bisa dihapus dari Kopma Hub. Dokumen `pengaturan/pendaftaran` (kode daftar) tetap tidak bisa dibaca siapa pun.
 
 ## Membuat akun kasir baru
 

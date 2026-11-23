@@ -73,6 +73,19 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Rumus poin bersama (1 poin setiap rpPerPoin rupiah). Dokumen ini saja yang boleh dibaca semua akun
+    // terdaftar; pengaturan/pendaftaran tetap tertutup karena aturan di atas tidak memberi izin apa pun.
+    match /pengaturan/poin {
+      allow read: if terdaftar();
+      allow create, update: if (admin() || punyaHub(['ketua', 'bendahara']))
+        && request.resource.data.keys().hasOnly(['rpPerPoin', 'diubah', 'diubahOleh'])
+        && request.resource.data.rpPerPoin is int
+        && request.resource.data.rpPerPoin >= 100 && request.resource.data.rpPerPoin <= 1000000
+        && request.resource.data.diubah == request.time
+        && request.resource.data.diubahOleh == akun().get('username', '');
+      allow delete: if false;
+    }
+
     // ---------- Data anggota (Kopma Hub) ----------
     // ID dokumen = NIA, jadi satu NIA tidak bisa terdaftar dua kali. Data tidak pernah dihapus.
     match /anggota/{nia} {

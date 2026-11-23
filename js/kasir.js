@@ -1,7 +1,7 @@
 /* Kopma Hub — sambungan ke Firebase project kopma-um (dipakai bersama web kasir).
    - Data kasir (products, transactions, pengeluaran, modal_harian): BACA SAJA.
    - Yang ditulis: data anggota (ketua/sekretaris, atau pemilik NIA untuk datanya sendiri), peran Kopma Hub
-     (ketua/sekretaris), dan pendaftaran akun dengan kode. Semua dibatasi aturan Firestore.
+     (ketua/sekretaris), rumus poin (ketua/bendahara, dokumen pengaturan/poin), dan pendaftaran akun dengan kode. Semua dibatasi aturan Firestore.
    Aturan Firestore (firebase/firestore.rules) menolak tulisan lain apa pun yang dikirim dari sini. */
 
 const KASIR_FIREBASE_CONFIG = {
@@ -22,6 +22,7 @@ const Kasir = {
   error: '',
   email: '',
   products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '',
+  rpPerPoin: 1000, rumusInfo: null, rumusError: '',   // rumus poin bersama dari pengaturan/poin (default Rp1.000)
   akun: null,           // dokumen users milik akun yang login: { uid, username, role, hub[], nama, nia }
   anggota: [], anggotaError: '', anggotaSaya: null, akunList: [], akunError: '',
   get aksesKasir() { return ['admin', 'kasir'].includes(this.akun?.role); },
@@ -60,14 +61,20 @@ const Kasir = {
     this._stop();
     const nia = this.akun?.nia || '';
     const poinSendiri = !this.aksesKasir && !!nia;
-    const perlu = (this.aksesKasir ? 4 : 0) + (this.bacaAnggota ? 1 : 0) + (nia && !this.bacaAnggota ? 1 : 0) + (poinSendiri ? 1 : 0) + (this.kelolaAkun ? 1 : 0);
+    const perlu = 1 + (this.aksesKasir ? 4 : 0) + (this.bacaAnggota ? 1 : 0) + (nia && !this.bacaAnggota ? 1 : 0) + (poinSendiri ? 1 : 0) + (this.kelolaAkun ? 1 : 0);
     let siap = 0;
     const done = () => { siap++; if (siap >= perlu) this._set({ on: true, status: 'on' }); else this.onChange(); };
-    if (!perlu) { this._set({ on: true, status: 'on' }); return; }
     const fail = (e) => { this._stop(); this._set({ on: false, status: 'error', error: this._pesan(e) }); };
     const once = (fn) => { let first = true; return (snap) => { fn(snap); if (first) { first = false; done(); } else this.onChange(); }; };
     // pendengar yang gagal sendiri tidak memutus sambungan (cukup tampilkan pesan)
     const lunak = (fn, errKey) => { let first = true; return [(snap) => { fn(snap); this[errKey] = ''; if (first) { first = false; done(); } else this.onChange(); }, (e) => { this[errKey] = this._pesan(e); if (first) { first = false; done(); } else this.onChange(); }]; };
+    // rumus poin dibaca semua akun terdaftar; kalau dokumen belum ada / aturan belum dipublish, pakai Rp1.000
+    this._unsubs.push(fs.onSnapshot(fs.doc(db, 'pengaturan', 'poin'), ...lunak((d) => {
+      const x = d.exists() ? d.data({ serverTimestamps: 'estimate' }) : {};
+      const v = Number(x.rpPerPoin);
+      this.rpPerPoin = Number.isInteger(v) && v >= 100 ? v : 1000;
+      this.rumusInfo = d.exists() ? { oleh: x.diubahOleh || '', waktu: x.diubah?.toDate ? x.diubah.toDate().toISOString() : '' } : null;
+    }, 'rumusError')));
     if (this.aksesKasir) {
       this._unsubs.push(
         fs.onSnapshot(fs.collection(db, 'products'), once((s) => { this.products = s.docs.map((d) => ({ id: d.id, ...d.data() })); }), fail),
@@ -139,7 +146,7 @@ const Kasir = {
     this._stop();
     Store.setPref('kasir', '');
     try { if (this._fb) await this._fb.auth.signOut(this._fb.authInst); } catch (e) { /* abaikan */ }
-    this._set({ on: false, status: 'off', products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '', email: '', akun: null, anggota: [], anggotaError: '', anggotaSaya: null, akunList: [], akunError: '' });
+    this._set({ on: false, status: 'off', products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '', rpPerPoin: 1000, rumusInfo: null, rumusError: '', email: '', akun: null, anggota: [], anggotaError: '', anggotaSaya: null, akunList: [], akunError: '' });
   },
 
   // daftar akun baru dengan kode pendaftaran (dicek aturan Firestore, bukan di sini)
@@ -185,6 +192,12 @@ const Kasir = {
   async ubahPeran(uid, hub) {
     const { fs, db } = await this._load();
     await fs.updateDoc(fs.doc(db, 'users', uid), { hub });
+  },
+
+  // ketua/bendahara mengubah rumus poin bersama (1 poin setiap v rupiah)
+  async simpanRumus(v) {
+    const { fs, db } = await this._load();
+    await fs.setDoc(fs.doc(db, 'pengaturan', 'poin'), { rpPerPoin: v, diubah: fs.serverTimestamp(), diubahOleh: this.akun?.username || '' });
   },
 
   // tambah / ubah data anggota (dokumen anggota/{NIA}); hanya berhasil untuk ketua & sekretaris
