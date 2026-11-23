@@ -13,6 +13,7 @@ Project: **kopma-um** (region Singapura, paket gratis). Menggantikan Firebase se
 | `…03_poin_gaji.sql` | poin anggota, gaji jaga 1%, saldo & penarikan, jadwal jaga |
 | `…04_rental.sql` | inventaris & booking sewa, kalender publik |
 | `…05_pengamanan.sql` | perbaikan dari pemeriksaan keamanan & performa Supabase |
+| `…06_indeks_kasir.sql` | indeks untuk pembaruan bertahap di web kasir |
 
 Semua migrasi sudah terpasang di project kopma-um.
 
