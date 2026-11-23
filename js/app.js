@@ -64,7 +64,7 @@ const ui = {
 };
 const save = () => Store.save(db);
 
-/* Mode akun sungguhan: login lewat Firebase (akun yang sama dengan web kasir).
+/* Mode akun sungguhan: login lewat Supabase (akun yang sama dengan web kasir).
    Peran Kopma Hub diambil dari field "hub" di dokumen users; role kasir "admin"/"kasir" ikut dipetakan. */
 const LIVE_ID = 'live';
 const isLive = () => meId === LIVE_ID;
@@ -106,7 +106,7 @@ const can = {
   jejak: () => has('super_admin') || isPHI(),
 };
 
-// Di mode akun sungguhan, modul yang datanya belum di Firebase disembunyikan supaya tidak tercampur data contoh.
+// Di mode akun sungguhan, modul yang datanya belum di database disembunyikan supaya tidak tercampur data contoh.
 ['akunView', 'akunEdit', 'anggotaView', 'anggotaFull', 'anggotaEdit', 'poinAdd', 'poinKoreksi', 'feeEdit', 'feeAll', 'jejak']
   .forEach((k) => { const f = can[k]; can[k] = () => !isLive() && f(); });
 can.anggotaLiveView = () => isLive() && (has('ketua', 'sekretaris', 'bendahara') || Kasir.akun?.role === 'admin');
@@ -115,13 +115,14 @@ can.jejakLive = () => isLive() && (has('ketua', 'sekretaris', 'bendahara') || Ka
 can.anggotaLiveEdit = () => isLive() && has('ketua', 'sekretaris');
 const stokTersedia = () => can.stokView() && (!isLive() || Kasir.aksesKasir);
 const rpPerPoin = () => (Kasir.on ? Kasir.rpPerPoin : db.pengaturan.rpPerPoin);
-const poinTersedia = () => !isLive() || Kasir.aksesKasir || !!Kasir.akun?.nia;
+// kasir & pengurus (poin dihitung server) atau anggota yang punya NIA; bendahara/ketua tanpa NIA tetap bisa mengatur rumus
+const poinTersedia = () => !isLive() || Kasir.bacaPoinSemua || !!Kasir.akun?.nia || can.poinRumus();
 
 function catat(modul, aksi) { db.log.unshift({ id: uid('l'), olehId: meId, modul, aksi, waktu: nowIso() }); }
 
 /* ================= Logika rental ================= */
 const AKTIF = ['Menunggu', 'Dikonfirmasi', 'Diambil'];
-// sumber data rental: halaman publik (salinan tanpa data penyewa), akun sungguhan (Firebase), atau demo
+// sumber data rental: halaman publik (salinan tanpa data penyewa), akun sungguhan (Supabase), atau demo
 const RB = () => (ui.view === 'sewa' ? Kasir.publik.barang : isLive() ? Kasir.sewaBarang : db.barangSewa);
 const RK = () => (ui.view === 'sewa' ? Kasir.publik.jadwal : isLive() ? Kasir.sewaBooking : db.booking);
 const aktifBrg = () => RB().filter((b) => b.aktif !== false);
@@ -132,9 +133,9 @@ const hariTerpakai = (ambil, kembali) => { const n = Math.max(1, diffDays(ambil,
 const terlambat = (b) => b.status === 'Diambil' && b.kembali < TODAY;
 function sisaUnit(barangId, tanggal, kecualiId) {
   const item = barangDari(barangId);
-  const dipakai = RK().filter((b) => b.barangId === barangId && b.id !== kecualiId && (AKTIF.includes(b.status)) && hariTerpakai(b.ambil, b.kembali).includes(tanggal)).reduce((a, b) => a + b.unit, 0);
+  const dipakai = RK().filter((b) => b.barangId === barangId && (kecualiId == null || b.id !== kecualiId) && (AKTIF.includes(b.status)) && hariTerpakai(b.ambil, b.kembali).includes(tanggal)).reduce((a, b) => a + b.unit, 0);
   // barang yang terlambat tetap memakai unit sampai dikembalikan
-  const telat = RK().filter((b) => b.barangId === barangId && b.id !== kecualiId && terlambat(b) && tanggal >= b.kembali && tanggal <= TODAY).reduce((a, b) => a + b.unit, 0);
+  const telat = RK().filter((b) => b.barangId === barangId && (kecualiId == null || b.id !== kecualiId) && terlambat(b) && tanggal >= b.kembali && tanggal <= TODAY).reduce((a, b) => a + b.unit, 0);
   return item.unit - dipakai - telat;
 }
 function cekKetersediaan(barangId, ambil, kembali, unit, kecualiId) {
@@ -185,7 +186,7 @@ const app = () => $('#app');
 function render() {
   if (location.hash === '#sewa') { ui.view = 'sewa'; app().innerHTML = viewSewaPublik(); return; }
   if (isLive() && !Kasir.on) {
-    if (Kasir.status === 'connecting') { app().innerHTML = `<div class="login-form c-sky" style="min-height:100vh"><div class="inner" style="text-align:center;justify-items:center"><img src="logo-kopma.png" alt="" style="width:64px;height:64px;border-radius:50%;background:#fff;padding:4px"><h2>Memuat Kopma Hub…</h2><p class="muted">Mengambil data dari Firebase.</p></div></div>`; return; }
+    if (Kasir.status === 'connecting') { app().innerHTML = `<div class="login-form c-sky" style="min-height:100vh"><div class="inner" style="text-align:center;justify-items:center"><img src="logo-kopma.png" alt="" style="width:64px;height:64px;border-radius:50%;background:#fff;padding:4px"><h2>Memuat Kopma Hub…</h2><p class="muted">Menyambung ke database Kopma.</p></div></div>`; return; }
     ui.loginError = Kasir.status === 'error' ? Kasir.error : ''; meId = null; Store.setPref('me', '');
   }
   if (!me() || !me().aktif) { app().innerHTML = viewLogin(); return; }
@@ -278,7 +279,7 @@ function viewLogin() {
         <a class="btn btn-soft c-tangerine" href="#sewa">${ic('cal', 'icon-sm')}Cek ketersediaan barang sewa</a>
         <details class="demo-box">
           <summary>Lihat mode demo (data contoh, bukan data asli)</summary>
-          <p class="small muted" style="margin:8px 0 10px">Untuk mencoba tampilan tiap peran. Tidak tersambung ke Firebase dan tidak menyimpan apa pun ke data asli.</p>
+          <p class="small muted" style="margin:8px 0 10px">Untuk mencoba tampilan tiap peran. Tidak tersambung ke database dan tidak menyimpan apa pun ke data asli.</p>
           <div class="demo-accounts">
             ${demo.map(([id, r]) => { const p = prof(id); return `<button type="button" class="demo-acc c-${ROLES[r].color}" data-act="demo-login" data-id="${id}"><span class="avatar c-${ROLES[r].color}" style="width:36px;height:36px;background:var(--c);color:#fff">${esc(inisial(p.nama))}</span><span><b>${esc(ROLES[r].label)}</b><span>${esc(p.nama)} · demo</span></span></button>`; }).join('')}
           </div>
@@ -386,10 +387,10 @@ function listAnggota() {
   if (f === 'dampingan') rows = rows.filter((p) => p.pendampingId === meId);
   return rows.length ? rows.map(anggotaRow).join('') : empty('search', 'Tidak ada anggota yang cocok. Coba nama atau NIA lain.');
 }
-/* ---------- Anggota (data asli di Firebase) ---------- */
+/* ---------- Anggota (data asli di Supabase) ---------- */
 const FAKULTAS_UM = ['FIP', 'FS', 'FMIPA', 'FEB', 'FT', 'FIK', 'FIS', 'FPPsi', 'FK'];
 function anggotaLiveRow(a) {
-  const poin = Kasir.aksesKasir ? (Kasir.poinPer(rpPerPoin()).get(a.nia)?.poin || 0) : null;
+  const poin = Kasir.bacaPoinSemua ? (Kasir.poinPer(rpPerPoin()).get(a.nia)?.poin || 0) : null;
   return `<div class="row click" data-act="anggota-live" data-nia="${esc(a.nia)}" role="button" tabindex="0" style="${a.aktif === false ? 'opacity:.55' : ''}">
     ${avatar({ id: a.nia, nama: a.nama || '?' })}
     <div class="grow"><div class="title">${esc(a.nama)}</div><div class="sub"><span class="num">${esc(a.nia)}</span> · ${esc(a.fakultas || '-')}, ${esc(a.prodi || '-')}</div></div>
@@ -409,7 +410,7 @@ function viewAnggotaLive() {
   const fak = [...new Set(Kasir.anggota.map((a) => a.fakultas).filter(Boolean))].sort();
   const filters = [['semua', 'Semua', Kasir.anggota.length], ['anggota', 'Anggota', Kasir.anggota.filter((a) => a.status === 'anggota').length], ['pengurus', 'Pengurus', Kasir.anggota.filter((a) => a.status === 'pengurus').length], ...fak.map((x) => [x, x, Kasir.anggota.filter((a) => a.fakultas === x).length])];
   return `
-  ${pageHead('Data anggota', `Tersimpan di Firebase, jadi sama di semua perangkat. ${can.anggotaLiveEdit() ? 'Ketua dan sekretaris bisa menambah dan mengubah.' : 'Kamu bisa melihat; perubahan oleh ketua atau sekretaris.'}`,
+  ${pageHead('Data anggota', `Tersimpan di database Kopma, jadi sama di semua perangkat. ${can.anggotaLiveEdit() ? 'Ketua dan sekretaris bisa menambah dan mengubah.' : 'Kamu bisa melihat; perubahan oleh ketua atau sekretaris.'}`,
     `${exportBtn('anggota')}${can.anggotaLiveEdit() ? `<button class="btn btn-primary" data-act="anggota-live-form">${ic('plus', 'icon-sm')}Tambah anggota</button>` : ''}`)}
   ${Kasir.anggotaError ? `<div class="notice c-coral">${ic('alert')}<span>Data anggota gagal dimuat: ${esc(Kasir.anggotaError)}</span></div>` : ''}
   <div class="toolbar"><div class="search">${ic('search')}<input class="input" id="qAnggotaLive" data-live="anggotaLive" placeholder="Cari nama, NIA, atau prodi…" value="${esc(ui.q.anggotaLive || '')}" aria-label="Cari anggota"></div></div>
@@ -728,7 +729,7 @@ function kartuPoinNia(nia, d) {
 function viewPoinKasir() {
   const rate = rpPerPoin();
   const data = Kasir.poinPer(rate);
-  const tabs = [['saya', 'Poin saya'], ...(Kasir.aksesKasir || !isLive() ? [['cek', 'Cek NIA']] : []), ...(can.poinAll() && (Kasir.aksesKasir || !isLive()) ? [['semua', 'Semua anggota']] : [])];
+  const tabs = [['saya', 'Poin saya'], ...(Kasir.bacaPoinSemua || !isLive() ? [['cek', 'Cek NIA']] : []), ...((can.poinAll() || isLive()) && (Kasir.bacaPoinSemua || !isLive()) ? [['semua', 'Semua anggota']] : [])];
   if (!tabs.find((t) => t[0] === ui.poinTab)) ui.poinTab = 'saya';
   let body = '';
   if (ui.poinTab === 'saya') {
@@ -758,7 +759,7 @@ function kartuRumus(rate) {
   const info = Kasir.rumusInfo;
   const ket = Kasir.rumusError ? `Rumus bersama belum bisa dibaca (${esc(Kasir.rumusError)}). Sementara memakai ${rp(rate)}.`
     : info ? `Terakhir diubah ${esc(info.oleh || 'pengurus')}${info.waktu ? ' · ' + waktu(info.waktu) : ''}.` : 'Belum pernah diubah, masih memakai bawaan Rp1.000.';
-  return `<section class="card c-sun"><form class="toolbar" data-form="rumus"><div class="field" style="flex:1 1 220px"><label for="rateInput">Rumus poin (ketua & bendahara)</label><div class="toolbar"><span>1 poin setiap</span><input class="input num" id="rateInput" name="rate" type="number" inputmode="numeric" min="1" max="1000000" step="1" value="${rate}" style="max-width:140px"><span>rupiah</span></div><span class="hint">Tersimpan di Firebase dan berlaku di semua perangkat, termasuk untuk transaksi lama karena poin dihitung ulang dari data kasir. ${ket}</span></div><button class="btn btn-primary" type="submit">Simpan rumus</button></form></section>`;
+  return `<section class="card c-sun"><form class="toolbar" data-form="rumus"><div class="field" style="flex:1 1 220px"><label for="rateInput">Rumus poin (ketua & bendahara)</label><div class="toolbar"><span>1 poin setiap</span><input class="input num" id="rateInput" name="rate" type="number" inputmode="numeric" min="1" max="1000000" step="1" value="${rate}" style="max-width:140px"><span>rupiah</span></div><span class="hint">Tersimpan di database dan berlaku di semua perangkat, termasuk untuk transaksi lama karena poin dihitung ulang dari data kasir. ${ket}</span></div><button class="btn btn-primary" type="submit">Simpan rumus</button></form></section>`;
 }
 function hasilCekNia() {
   const nia = normNia(ui.q.ceknia);
@@ -906,7 +907,7 @@ function viewGajiLive() {
   } else {
     const tunggu = Kasir.penarikan.filter((p) => p.status === 'diajukan');
     const selesai = Kasir.penarikan.filter((p) => p.status !== 'diajukan');
-    body = `<section class="card c-mint"><form class="toolbar" data-form="waBendahara"><div class="field" style="flex:1 1 200px"><label for="waBend">Nomor WA bendahara</label><input class="input num" id="waBend" name="wa" inputmode="tel" placeholder="08…" value="${esc(waTampil(Kasir.waBendahara))}" required><span class="hint">Pengajuan tarik gaji dari petugas dikirim ke nomor ini lewat WhatsApp. Tersimpan di Firebase, tidak di kode.</span></div><button class="btn btn-primary" type="submit" id="waBendBtn">Simpan nomor</button></form></section>
+    body = `<section class="card c-mint"><form class="toolbar" data-form="waBendahara"><div class="field" style="flex:1 1 200px"><label for="waBend">Nomor WA bendahara</label><input class="input num" id="waBend" name="wa" inputmode="tel" placeholder="08…" value="${esc(waTampil(Kasir.waBendahara))}" required><span class="hint">Pengajuan tarik gaji dari petugas dikirim ke nomor ini lewat WhatsApp. Tersimpan di database, tidak di kode.</span></div><button class="btn btn-primary" type="submit" id="waBendBtn">Simpan nomor</button></form></section>
     <section class="card c-sun"><div class="card-head"><h2>Menunggu diproses</h2><span class="pill">${tunggu.length}</span></div><div class="list">${tunggu.length ? tunggu.map((p) => barisTarik(p, true)).join('') : empty('check', 'Tidak ada penarikan yang menunggu.', 'mint')}</div>
       <p class="small muted" style="margin-top:8px">Tekan Proses untuk mengecek saldo petugas sebelum menyerahkan uang. Penarikanmu sendiri diproses pengurus lain.</p></section>
     <section class="card"><div class="card-head"><h2>Riwayat</h2></div><div class="list">${selesai.length ? selesai.slice(0, 100).map((p) => barisTarik(p, true)).join('') : empty('history', 'Belum ada riwayat penarikan.')}</div></section>`;
@@ -962,7 +963,7 @@ function viewAkunLive() {
   const q = (ui.q.akunLive || '').toLowerCase();
   const rows = Kasir.akunList.filter((u) => { const nama = anggotaByNia(u.nia)?.nama || u.nama || ''; return !q || [u.username, nama, u.nia].some((v) => String(v || '').toLowerCase().includes(q)); });
   const label = { admin: 'Kasir: admin', kasir: 'Kasir: kasir', anggota: 'Anggota', pengurus: 'Pengurus' };
-  return `${pageHead('Akun & peran', 'Atur peran Kopma Hub tiap akun. Role kasir (admin/kasir) tetap diatur admin lewat Firebase.')}
+  return `${pageHead('Akun & peran', 'Atur peran Kopma Hub tiap akun. Role kasir (admin/kasir) tetap diatur admin lewat dashboard Supabase.')}
   ${Kasir.akunError ? `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir.akunError)}</span></div>` : ''}
   <div class="toolbar"><div class="search">${ic('search')}<input class="input" data-live="akunLive" placeholder="Cari nama pengguna, nama, atau NIA…" value="${esc(ui.q.akunLive || '')}" aria-label="Cari akun"></div></div>
   <div class="list" id="listAkunLive">${rows.map((u) => { const nama = anggotaByNia(u.nia)?.nama || u.nama || u.username; const saya = u.uid === Kasir.akun?.uid;
@@ -987,7 +988,7 @@ function viewAkun() {
 
 /* ---------- Jejak ---------- */
 function viewJejakLive() {
-  const MOD = { semua: ['Semua', 'coral'], anggota: ['Anggota', 'sky'], akun: ['Akun', 'mint'], rental: ['Rental', 'tangerine'], poin: ['Poin', 'grape'], gaji: ['Gaji', 'pink'], jadwal: ['Jadwal', 'lime'] };
+  const MOD = { semua: ['Semua', 'coral'], anggota: ['Anggota', 'sky'], akun: ['Akun', 'mint'], rental: ['Rental', 'tangerine'], poin: ['Poin', 'grape'], gaji: ['Gaji', 'pink'], jadwal: ['Jadwal', 'lime'], kasir: ['Kasir', 'sky'] };
   if (!MOD[ui.jejakModul]) ui.jejakModul = 'semua';
   const nama = (u) => Kasir.akunList.find((a) => a.username === u)?.nama || u;
   // pendaftaran & penghubungan akun bukan perubahan data, tidak ditampilkan (catatan lama)
@@ -1172,7 +1173,7 @@ const ACT = {
   'anggota-live-form': (el) => formAnggotaLive(el.dataset.nia ? Kasir.anggota.find((a) => a.nia === el.dataset.nia) : null),
   'anggota-live': (el) => {
     const a = Kasir.anggota.find((x) => x.nia === el.dataset.nia); if (!a) return;
-    const d = Kasir.aksesKasir ? Kasir.poinPer(rpPerPoin()).get(a.nia) : null;
+    const d = Kasir.bacaPoinSemua ? Kasir.poinPer(rpPerPoin()).get(a.nia) : null;
     openModal('Data anggota', `<div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">${avatar({ id: a.nia, nama: a.nama }, 56)}<div><h2>${esc(a.nama)}</h2><p class="muted num">NIA ${esc(a.nia)}</p></div></div>
       <dl class="kv"><dt>Fakultas</dt><dd>${esc(a.fakultas || '-')}</dd><dt>Prodi</dt><dd>${esc(a.prodi || '-')}</dd><dt>Status</dt><dd>${a.status === 'pengurus' ? 'Pengurus' + (a.bidang ? ' · ' + esc(a.bidang) : '') : 'Anggota'}${a.aktif === false ? ' (tidak aktif)' : ''}</dd>${a.angkatan ? `<dt>Angkatan</dt><dd class="num">${esc(a.angkatan)}</dd>` : ''}${a.wa ? `<dt>WhatsApp</dt><dd class="num">${esc(a.wa)}</dd>` : ''}<dt>Ditambahkan</dt><dd>${a.dibuat ? waktu(a.dibuat) : '-'}${a.dibuatOleh ? ' · ' + esc(a.dibuatOleh) : ''}</dd>${a.diubah ? `<dt>Terakhir diubah</dt><dd>${waktu(a.diubah)} · ${esc(a.diubahOleh || '')}</dd>` : ''}</dl>
       ${Kasir.aksesKasir ? `<div class="notice c-grape" style="margin-top:14px">${ic('star')}<span>Poin dari kasir: <b class="num">${fmtNum(d?.poin || 0)}</b>${d ? ` · ${d.n}× belanja, ${rp(d.belanja)}` : ''}</span></div>` : ''}`, 'sky',
@@ -1300,7 +1301,7 @@ const ACT = {
   'tarik-proses': async (el) => {
     const p = Kasir.penarikan.find((x) => x.id === el.dataset.id); if (!p) return;
     openModal(`Penarikan ${esc(namaAkun(p.username))}`, `<div id="cekSaldo">${empty('history', 'Mengecek saldo dari transaksi kasir…')}</div>`, 'pink');
-    let g; try { g = Kasir.ringkasGaji(await Kasir.trxMilik(p.username), p.username); } catch (e) { $('#cekSaldo').innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir._pesan(e))}</span></div>`; return; }
+    let g; try { g = await Kasir.saldoOrang(p.username); } catch (e) { $('#cekSaldo').innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir._pesan(e))}</span></div>`; return; }
     const sebelum = g.saldo + p.nominal; const cukup = sebelum >= p.nominal;
     if (!$('#cekSaldo')) return;
     $('#cekSaldo').innerHTML = `<form class="form" data-form="prosesTarik" id="prosesForm"><input type="hidden" name="id" value="${esc(p.id)}">
@@ -1605,7 +1606,7 @@ const FORM = {
   rumus: async (f) => {
     const v = parseInt(f.rate.value, 10);
     if (!Number.isInteger(v) || v < 1 || v > 1000000) { toast('Isi angka bulat antara 1 dan 1.000.000 rupiah', 'coral'); return; }
-    if (Kasir.on) {   // rumus bersama di Firebase, berlaku di semua perangkat
+    if (Kasir.on) {   // rumus bersama di database, berlaku di semua perangkat
       const btn = f.querySelector('button[type=submit]'); if (btn) btn.disabled = true;
       try { await Kasir.simpanRumus(v); toast(`Rumus baru: ${rp(v)} = 1 poin`, 'sun'); render(); }
       catch (e) { toast(String(e?.code || '').includes('permission-denied') ? 'Rumus ditolak. Hanya ketua, bendahara, atau admin yang bisa mengubahnya.' : Kasir._pesan(e), 'coral'); if (btn) btn.disabled = false; }
