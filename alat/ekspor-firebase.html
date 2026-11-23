@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ekspor Data Firebase</title>
+  <meta name="robots" content="noindex">
+  <style>
+    :root { --navy: #1C2461; --bg: #F4F5FD; --kartu: #fff; --teks: #1C2461; --redup: #5b6290; --hijau: #12a37a; --merah: #d6455d; --kuning: #f5b301; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #121530; --kartu: #1c2046; --teks: #eef0ff; --redup: #a9aed6; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--teks); }
+    main { max-width: 560px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { font-size: 1.5rem; margin: 0 0 6px; }
+    p { line-height: 1.55; color: var(--redup); margin: 0 0 12px; }
+    .kartu { background: var(--kartu); border-radius: 16px; padding: 20px; box-shadow: 0 4px 18px rgba(28,36,97,.08); margin-top: 16px; }
+    label { display: block; font-weight: 600; margin: 12px 0 6px; }
+    input { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #c9cde8; font-size: 1rem; background: transparent; color: var(--teks); }
+    button { margin-top: 16px; width: 100%; padding: 14px; border: 0; border-radius: 12px; background: var(--navy); color: #fff; font-weight: 700; font-size: 1rem; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: wait; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(128,128,160,.2); font-variant-numeric: tabular-nums; }
+    .ok { color: var(--hijau); font-weight: 700; } .gagal { color: var(--merah); font-weight: 700; } .tunggu { color: var(--kuning); }
+    .catatan { font-size: .9rem; border-left: 4px solid var(--kuning); padding-left: 10px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Ekspor data Firebase</h1>
+  <p>Alat sekali pakai untuk pindah ke Supabase. Mengunduh seluruh data Kopma dari Firebase sebagai satu file JSON. <b>Hanya membaca</b>, tidak mengubah apa pun.</p>
+  <p class="catatan">Gunakan akun <b>admin kasir</b>. File berisi data pribadi anggota: jangan diunggah ke repo atau dibagikan di grup.</p>
+
+  <form class="kartu" id="form">
+    <label for="u">Nama pengguna admin</label>
+    <input id="u" autocomplete="username" autocapitalize="none" required>
+    <label for="p">Kata sandi</label>
+    <input id="p" type="password" autocomplete="current-password" required>
+    <button id="tombol" type="submit">Masuk &amp; ekspor</button>
+  </form>
+
+  <section class="kartu" id="hasil" hidden>
+    <ul id="daftar"></ul>
+    <p id="pesan" style="margin-top:12px"></p>
+  </section>
+</main>
+
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js';
+  import { getAuth, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js';
+  import { getFirestore, collection, getDocs, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js';
+
+  const app = initializeApp({
+    apiKey: 'AIzaSyBINmUacCCgyXsQOn898lKWPTkygCO92xA', authDomain: 'kopma-um.firebaseapp.com', projectId: 'kopma-um',
+    storageBucket: 'kopma-um.firebasestorage.app', messagingSenderId: '985041442661', appId: '1:985041442661:web:4fcd6030b3880088eb338c',
+  }, 'ekspor');
+  const auth = getAuth(app), db = getFirestore(app);
+
+  const KOLEKSI = ['users', 'anggota', 'products', 'transactions', 'pengeluaran', 'modal_harian', 'jadwal_jaga', 'penarikan_gaji', 'sewa_barang', 'sewa_booking', 'jejak'];
+  const PENGATURAN = ['poin', 'kontak'];   // pengaturan/pendaftaran (kode daftar) sengaja tidak bisa dibaca
+
+  // Timestamp Firestore → teks ISO, supaya bisa disimpan sebagai JSON
+  const polos = (v) => {
+    if (v && typeof v.toDate === 'function') return v.toDate().toISOString();
+    if (Array.isArray(v)) return v.map(polos);
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, polos(x)]));
+    return v;
+  };
+  const baris = (nama) => { const li = document.createElement('li'); li.innerHTML = `<span>${nama}</span><span class="tunggu">memuat…</span>`; document.getElementById('daftar').append(li); return li.lastChild; };
+
+  document.getElementById('form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const tombol = document.getElementById('tombol'); tombol.disabled = true; tombol.textContent = 'Memproses…';
+    const pesan = document.getElementById('pesan'); document.getElementById('hasil').hidden = false; document.getElementById('daftar').innerHTML = '';
+    const email = document.getElementById('u').value.replace(/\s+/g, '').toLowerCase() + '@kopma.um';
+    try { await signInWithEmailAndPassword(auth, email, document.getElementById('p').value); }
+    catch (e) { pesan.innerHTML = '<span class="gagal">Nama pengguna atau kata sandi salah.</span>'; tombol.disabled = false; tombol.textContent = 'Masuk & ekspor'; return; }
+
+    const out = { dibuat: new Date().toISOString(), sumber: 'Firebase kopma-um', oleh: email, koleksi: {}, galat: {} };
+    for (const k of KOLEKSI) {
+      const el = baris(k);
+      try {
+        const s = await getDocs(collection(db, k));
+        out.koleksi[k] = s.docs.map((d) => ({ _id: d.id, ...polos(d.data()) }));
+        el.className = 'ok'; el.textContent = s.size + ' data';
+      } catch (e) { out.galat[k] = e.code || e.message; el.className = 'gagal'; el.textContent = 'gagal: ' + (e.code || e.message); }
+    }
+    const elP = baris('pengaturan (rumus poin, WA bendahara)');
+    out.koleksi.pengaturan = [];
+    for (const id of PENGATURAN) {
+      try { const d = await getDoc(doc(db, 'pengaturan', id)); if (d.exists()) out.koleksi.pengaturan.push({ _id: id, ...polos(d.data()) }); }
+      catch (e) { out.galat['pengaturan/' + id] = e.code || e.message; }
+    }
+    elP.className = out.galat['pengaturan/poin'] ? 'gagal' : 'ok'; elP.textContent = out.koleksi.pengaturan.length + ' data';
+    await signOut(auth);
+
+    const tgl = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+    const blob = new Blob([JSON.stringify(out)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `kopma-firestore-${tgl}.json`; a.click();
+    const jumlahGagal = Object.keys(out.galat).length;
+    pesan.innerHTML = jumlahGagal
+      ? `<span class="gagal">${jumlahGagal} bagian gagal dibaca.</span> File tetap terunduh; kirim saja beserta tangkapan layar halaman ini.`
+      : '<span class="ok">Selesai.</span> File <b>' + a.download + '</b> sudah terunduh. Kirim file itu di chat Claude (jangan ke repo atau grup).';
+    tombol.disabled = false; tombol.textContent = 'Ekspor lagi';
+  });
+</script>
+</body>
+</html>
