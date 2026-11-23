@@ -46,7 +46,7 @@ service cloud.firestore {
     // kodenya disimpan di pengaturan/pendaftaran yang tidak bisa dibaca siapa pun), NIA sudah ada di
     // data anggota, dan NIA itu belum diklaim akun lain. Akun baru selalu ber-role "anggota" tanpa peran hub.
     match /users/{uid} {
-      allow read: if masuk() && (request.auth.uid == uid || admin() || punyaHub(['ketua', 'sekretaris']));
+      allow read: if masuk() && (request.auth.uid == uid || admin() || punyaHub(['ketua', 'sekretaris', 'bendahara', 'bidang_usaha']));
       allow create: if admin()
         || (masuk() && request.auth.uid == uid
             && request.resource.data.keys().hasOnly(['username', 'role', 'nia', 'dibuat', 'jejakId'])
@@ -135,13 +135,59 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.oleh == getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.username
         && request.resource.data.waktu == request.time
-        && request.resource.data.modul in ['anggota', 'akun', 'poin']
+        && request.resource.data.modul in ['anggota', 'akun', 'poin', 'gaji', 'jadwal']
         && request.resource.data.aksi is string && request.resource.data.aksi.size() >= 3 && request.resource.data.aksi.size() <= 300
         && request.resource.data.kolom is list && request.resource.data.kolom.size() <= 20
         && request.resource.data.target is string
-        && request.resource.data.target.matches('^(anggota|users)/[^/]+$|^pengaturan/poin$')
+        && request.resource.data.target.matches('^(anggota|users|jadwal_jaga|penarikan_gaji)/[^/]+$|^pengaturan/poin$')
         && getAfter(path('/databases/' + database + '/documents/' + request.resource.data.target)).data.get('jejakId', '') == id;
       allow update, delete: if false;
+    }
+
+    // ---------- Jadwal jaga (Kopma Hub) ----------
+    // Satu dokumen per tanggal (ID = YYYY-MM-DD) berisi nama pengguna petugas. Semua akun terdaftar bisa melihat;
+    // bidang usaha, ketua, dan admin yang mengatur. Tidak pernah dihapus (dikosongkan saja).
+    match /jadwal_jaga/{tgl} {
+      allow read: if terdaftar();
+      allow create, update: if (admin() || punyaHub(['ketua', 'bidang_usaha']))
+        && tgl.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.keys().hasOnly(['tanggal', 'petugas', 'catatan', 'diubah', 'diubahOleh', 'jejakId'])
+        && request.resource.data.tanggal == tgl
+        && request.resource.data.petugas is list && request.resource.data.petugas.size() <= 10
+        && request.resource.data.get('catatan', '') is string && request.resource.data.get('catatan', '').size() <= 200
+        && jejakBaru('jadwal_jaga/' + tgl) && (resource == null || kolomTercatat());
+      allow delete: if false;
+    }
+
+    // ---------- Penarikan gaji jaga (Kopma Hub) ----------
+    // Gaji = 1% penjualan akun kasir sendiri per hari, dihitung dari transaksi (bukan disimpan).
+    // Petugas mengajukan penarikan (minimal Rp10.000); ketua/bendahara/admin menandai dibayar atau ditolak,
+    // tapi tidak bisa memproses penarikannya sendiri. Kecukupan saldo dicek aplikasi dan oleh yang membayar.
+    match /penarikan_gaji/{id} {
+      allow read: if terdaftar() && (resource.data.uid == request.auth.uid || admin() || punyaHub(['ketua', 'bendahara']));
+      allow create: if terdaftar()
+        && request.resource.data.keys().hasOnly(['uid', 'username', 'nominal', 'status', 'diajukan', 'jejakId'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.username == akun().get('username', '')
+        && request.resource.data.nominal is int
+        && request.resource.data.nominal >= 10000 && request.resource.data.nominal <= 5000000
+        && request.resource.data.status == 'diajukan'
+        && request.resource.data.diajukan == request.time
+        && jejakBaru('penarikan_gaji/' + id);
+      allow update: if resource.data.status == 'diajukan'
+        && request.resource.data.diproses == request.time
+        && request.resource.data.diprosesOleh == akun().get('username', '')
+        && (
+          ((admin() || punyaHub(['ketua', 'bendahara'])) && resource.data.uid != request.auth.uid
+            && request.resource.data.status in ['dibayar', 'ditolak']
+            && berubahHanya(['status', 'diproses', 'diprosesOleh', 'alasan', 'jejakId'])
+            && request.resource.data.get('alasan', '') is string && request.resource.data.get('alasan', '').size() <= 200)
+          || (resource.data.uid == request.auth.uid
+            && request.resource.data.status == 'dibatalkan'
+            && berubahHanya(['status', 'diproses', 'diprosesOleh', 'jejakId']))
+        )
+        && jejakBaru('penarikan_gaji/' + id) && kolomTercatat();
+      allow delete: if false;
     }
 
     // ---------- Produk ----------
@@ -158,8 +204,12 @@ service cloud.firestore {
 
     // ---------- Transaksi ----------
     match /transactions/{id} {
-      // anggota hanya bisa membaca transaksi dengan NIA miliknya sendiri (untuk poin)
-      allow read: if petugas() || (niaSaya() != '' && resource.data.get('niaAnggota', '') == niaSaya());
+      // anggota hanya bisa membaca transaksi dengan NIA miliknya sendiri (untuk poin);
+      // pengurus inti & bidang usaha membaca semua (laporan jaga); setiap akun membaca transaksi yang dia layani (gaji)
+      allow read: if petugas()
+        || (niaSaya() != '' && resource.data.get('niaAnggota', '') == niaSaya())
+        || punyaHub(['ketua', 'sekretaris', 'bendahara', 'bidang_usaha'])
+        || (terdaftar() && resource.data.get('kasir', '') == akun().get('username', ''));
       allow create: if petugas()
         && request.resource.data.total is number
         && request.resource.data.item is list;

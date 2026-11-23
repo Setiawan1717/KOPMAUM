@@ -26,9 +26,16 @@ const Kasir = {
   rpPerPoin: 1000, rumusInfo: null, rumusError: '',   // rumus poin bersama dari pengaturan/poin (default Rp1.000)
   akun: null,           // dokumen users milik akun yang login: { uid, username, role, hub[], nama, nia }
   anggota: [], anggotaError: '', anggotaSaya: null, akunList: [], akunError: '', jejak: [], jejakError: '',
+  // gaji jaga: 1% penjualan akun sendiri per hari, ditabung; penarikan minimal Rp10.000
+  jadwal: [], jadwalError: '', penarikan: [], penarikanError: '', trxGaji: [], gajiError: '',
+  laporanBulan: '', trxLaporan: [], laporanError: '', laporanSiap: false, _unsubLaporan: null,
   get aksesKasir() { return ['admin', 'kasir'].includes(this.akun?.role); },
   get kelolaAkun() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'sekretaris'].includes(r)); },
   get bacaJejak() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'sekretaris', 'bendahara'].includes(r)); },
+  get prosesGaji() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'bendahara'].includes(r)); },
+  get aturJadwal() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'bidang_usaha'].includes(r)); },
+  get bacaLaporan() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'sekretaris', 'bendahara', 'bidang_usaha'].includes(r)); },
+  get bacaAkun() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'sekretaris', 'bendahara', 'bidang_usaha'].includes(r)); },
   get bacaAnggota() { return this.akun?.role === 'admin' || (this.akun?.hub || []).some((r) => ['ketua', 'sekretaris', 'bendahara'].includes(r)); },
   onChange: () => {},
   _fb: null, _unsubs: [],
@@ -63,7 +70,7 @@ const Kasir = {
     this._stop();
     const nia = this.akun?.nia || '';
     const poinSendiri = !this.aksesKasir && !!nia;
-    const perlu = 1 + (this.aksesKasir ? 4 : 0) + (this.bacaAnggota ? 1 : 0) + (nia && !this.bacaAnggota ? 1 : 0) + (poinSendiri ? 1 : 0) + (this.kelolaAkun ? 1 : 0) + (this.bacaJejak ? 1 : 0);
+    const perlu = 1 + (this.aksesKasir ? 4 : 0) + (this.bacaAnggota ? 1 : 0) + (nia && !this.bacaAnggota ? 1 : 0) + (poinSendiri ? 1 : 0) + (this.bacaAkun ? 1 : 0) + (this.bacaJejak ? 1 : 0) + 2 + (this.akun?.username ? 1 : 0);
     let siap = 0;
     const done = () => { siap++; if (siap >= perlu) this._set({ on: true, status: 'on' }); else this.onChange(); };
     const fail = (e) => { this._stop(); this._set({ on: false, status: 'error', error: this._pesan(e) }); };
@@ -102,7 +109,24 @@ const Kasir = {
         this.jejak = s.docs.map((d) => { const x = d.data({ serverTimestamps: 'estimate' }); return { ...x, id: d.id, waktu: x.waktu?.toDate ? x.waktu.toDate().toISOString() : '' }; });
       }, 'jejakError')));
     }
-    if (this.kelolaAkun) {
+    // jadwal jaga: semua akun terdaftar
+    this._unsubs.push(fs.onSnapshot(fs.collection(db, 'jadwal_jaga'), ...lunak((s) => {
+      this.jadwal = s.docs.map((d) => ({ ...d.data(), tanggal: d.id })).sort((a, b) => a.tanggal.localeCompare(b.tanggal));
+    }, 'jadwalError')));
+    // penarikan gaji: ketua/bendahara/admin melihat semua, selain itu hanya miliknya
+    const qTarik = this.prosesGaji ? fs.query(fs.collection(db, 'penarikan_gaji'), fs.orderBy('diajukan', 'desc'), fs.limit(500))
+      : fs.query(fs.collection(db, 'penarikan_gaji'), fs.where('uid', '==', this.akun.uid));
+    this._unsubs.push(fs.onSnapshot(qTarik, ...lunak((s) => {
+      this.penarikan = s.docs.map((d) => { const x = d.data({ serverTimestamps: 'estimate' }); const iso = (v) => (v?.toDate ? v.toDate().toISOString() : ''); return { ...x, id: d.id, diajukan: iso(x.diajukan), diproses: iso(x.diproses) }; })
+        .sort((a, b) => String(b.diajukan).localeCompare(String(a.diajukan)));
+    }, 'penarikanError')));
+    // transaksi yang dilayani akun ini sendiri (dasar gaji)
+    if (this.akun?.username) {
+      this._unsubs.push(fs.onSnapshot(fs.query(fs.collection(db, 'transactions'), fs.where('kasir', '==', this.akun.username)), ...lunak((s) => {
+        this.trxGaji = s.docs.map((d) => ({ id: d.id, tanggal: d.data().tanggal, total: d.data().total, kasir: d.data().kasir }));
+      }, 'gajiError')));
+    }
+    if (this.bacaAkun) {
       this._unsubs.push(fs.onSnapshot(fs.collection(db, 'users'), ...lunak((s) => {
         this.akunList = s.docs.map((d) => ({ uid: d.id, ...d.data() })).sort((a, b) => String(a.username).localeCompare(String(b.username)));
       }, 'akunError')));
@@ -116,7 +140,7 @@ const Kasir = {
     const d = snap.data();
     this.akun = { uid: user.uid, username: d.username || user.email.split('@')[0], role: d.role || '', hub: Array.isArray(d.hub) ? d.hub : [], nama: d.nama || '', nia: d.nia ? String(d.nia).replace(/\s+/g, '').toUpperCase() : '' };
   },
-  _stop() { this._unsubs.forEach((u) => { try { u(); } catch (e) { /* abaikan */ } }); this._unsubs = []; },
+  _stop() { this._stopLaporan(); this._unsubs.forEach((u) => { try { u(); } catch (e) { /* abaikan */ } }); this._unsubs = []; },
 
   async connect(email, pass) {
     this._set({ status: 'connecting', error: '' });
@@ -153,7 +177,7 @@ const Kasir = {
     this._stop();
     Store.setPref('kasir', '');
     try { if (this._fb) await this._fb.auth.signOut(this._fb.authInst); } catch (e) { /* abaikan */ }
-    this._set({ on: false, status: 'off', products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '', rpPerPoin: 1000, rumusInfo: null, rumusError: '', email: '', akun: null, anggota: [], anggotaError: '', anggotaSaya: null, akunList: [], akunError: '', jejak: [], jejakError: '' });
+    this._set({ on: false, status: 'off', products: [], transactions: [], pengeluaran: [], trxAnggota: [], poinError: '', rpPerPoin: 1000, rumusInfo: null, rumusError: '', email: '', akun: null, anggota: [], anggotaError: '', anggotaSaya: null, akunList: [], akunError: '', jejak: [], jejakError: '', jadwal: [], jadwalError: '', penarikan: [], penarikanError: '', trxGaji: [], gajiError: '', laporanBulan: '', trxLaporan: [], laporanError: '', laporanSiap: false });
   },
 
   // catatan jejak untuk satu perubahan; ditulis di batch/transaksi yang sama dengan perubahannya.
@@ -163,6 +187,78 @@ const Kasir = {
     const ref = fs.doc(fs.collection(db, 'jejak'));
     w.set(ref, { modul, aksi: String(aksi).slice(0, 300), target, kolom, oleh: username ?? (this.akun?.username || ''), uid: this._fb.authInst.currentUser.uid, waktu: fs.serverTimestamp() });
     return ref.id;
+  },
+
+  /* ---- Gaji jaga ---- */
+  GAJI_PERSEN: 1, MIN_TARIK: 10000,
+  // per hari (waktu lokal): penjualan dan gaji = 1% dibulatkan ke bawah
+  gajiHarian(trx) {
+    const map = new Map();
+    trx.forEach((t) => {
+      if (!t.tanggal) return; const tgl = ymd(new Date(t.tanggal)); const k = `${t.kasir || ''}|${tgl}`;
+      const d = map.get(k) || { kasir: t.kasir || '', tanggal: tgl, penjualan: 0, n: 0, gaji: 0 };
+      d.penjualan += Number(t.total) || 0; d.n++; map.set(k, d);
+    });
+    map.forEach((d) => { d.gaji = Math.floor(d.penjualan * this.GAJI_PERSEN / 100); });
+    return [...map.values()].sort((a, b) => b.tanggal.localeCompare(a.tanggal) || a.kasir.localeCompare(b.kasir));
+  },
+  ringkasGaji(trx, username) {
+    const hari = this.gajiHarian(trx.filter((t) => t.kasir === username));
+    const total = hari.reduce((a, d) => a + d.gaji, 0);
+    const milik = this.penarikan.filter((p) => p.username === username);
+    const dibayar = milik.filter((p) => p.status === 'dibayar').reduce((a, p) => a + (Number(p.nominal) || 0), 0);
+    const diajukan = milik.filter((p) => p.status === 'diajukan').reduce((a, p) => a + (Number(p.nominal) || 0), 0);
+    return { hari, total, dibayar, diajukan, saldo: total - dibayar - diajukan, penjualan: hari.reduce((a, d) => a + d.penjualan, 0) };
+  },
+  get gajiSaya() { return this.ringkasGaji(this.trxGaji, this.akun?.username || ''); },
+  // laporan satu bulan (YYYY-MM) untuk pengurus: dengarkan transaksi bulan itu saja
+  _stopLaporan() { if (this._unsubLaporan) { try { this._unsubLaporan(); } catch (e) { /* abaikan */ } } this._unsubLaporan = null; },
+  muatLaporan(bulan) {
+    if (!this._fb || !this.bacaLaporan || this.laporanBulan === bulan) return;
+    const { fs, db } = this._fb; this._stopLaporan();
+    const [y, m] = bulan.split('-').map(Number);
+    const awal = new Date(y, m - 1, 1).toISOString(), akhir = new Date(y, m, 1).toISOString();
+    Object.assign(this, { laporanBulan: bulan, trxLaporan: [], laporanError: '', laporanSiap: false });
+    this._unsubLaporan = fs.onSnapshot(fs.query(fs.collection(db, 'transactions'), fs.where('tanggal', '>=', awal), fs.where('tanggal', '<', akhir)),
+      (s) => { this.trxLaporan = s.docs.map((d) => ({ id: d.id, tanggal: d.data().tanggal, total: d.data().total, kasir: d.data().kasir })); this.laporanSiap = true; this.laporanError = ''; this.onChange(); },
+      (e) => { this.laporanError = this._pesan(e); this.laporanSiap = true; this.onChange(); });
+  },
+  // seluruh transaksi seseorang (untuk mengecek saldo sebelum membayar penarikan)
+  async trxMilik(username) {
+    const { fs, db } = await this._load();
+    const s = await fs.getDocs(fs.query(fs.collection(db, 'transactions'), fs.where('kasir', '==', username)));
+    return s.docs.map((d) => ({ id: d.id, tanggal: d.data().tanggal, total: d.data().total, kasir: d.data().kasir }));
+  },
+  _rp: (n) => 'Rp' + Number(n || 0).toLocaleString('id-ID'),
+  async ajukanPenarikan(nominal) {
+    const { fs, db } = await this._load();
+    const b = fs.writeBatch(db); const ref = fs.doc(fs.collection(db, 'penarikan_gaji'));
+    const jejakId = this._jejak(b, { target: 'penarikan_gaji/' + ref.id, modul: 'gaji', aksi: `${this.akun.username} mengajukan penarikan gaji ${this._rp(nominal)}` });
+    b.set(ref, { uid: this.akun.uid, username: this.akun.username, nominal, status: 'diajukan', diajukan: fs.serverTimestamp(), jejakId });
+    await b.commit();
+  },
+  async prosesPenarikan(p, status, alasan = '') {
+    const { fs, db } = await this._load();
+    const b = fs.writeBatch(db);
+    const label = { dibayar: 'dibayar', ditolak: 'ditolak', dibatalkan: 'dibatalkan' }[status];
+    const kolom = ['status', 'diproses', 'diprosesOleh', ...(alasan ? ['alasan'] : [])];
+    const jejakId = this._jejak(b, { target: 'penarikan_gaji/' + p.id, modul: 'gaji', aksi: `Penarikan gaji ${p.username} ${this._rp(p.nominal)} ${label}${alasan ? ': ' + alasan : ''}`, kolom });
+    b.update(fs.doc(db, 'penarikan_gaji', p.id), { status, diproses: fs.serverTimestamp(), diprosesOleh: this.akun.username, ...(alasan ? { alasan } : {}), jejakId });
+    await b.commit();
+  },
+  async simpanJadwal(tanggal, petugas, catatan, labelTgl) {
+    const { fs, db } = await this._load();
+    const ref = fs.doc(db, 'jadwal_jaga', tanggal);
+    return fs.runTransaction(db, async (tx) => {
+      const ada = await tx.get(ref); const lama = ada.exists() ? ada.data() : null;
+      const baru = { petugas, catatan };
+      const kolom = lama ? Object.keys(baru).filter((k) => JSON.stringify(lama[k] ?? (k === 'catatan' ? '' : [])) !== JSON.stringify(baru[k])) : [];
+      if (lama && !kolom.length) return false;
+      const jejakId = this._jejak(tx, { target: 'jadwal_jaga/' + tanggal, modul: 'jadwal', aksi: `Jadwal jaga ${labelTgl || tanggal}: ${petugas.join(', ') || 'dikosongkan'}${catatan ? ' (' + catatan + ')' : ''}`, kolom });
+      const isi = { tanggal, petugas, catatan, diubah: new Date().toISOString(), diubahOleh: this.akun.username, jejakId };
+      if (lama) tx.update(ref, isi); else tx.set(ref, isi);
+      return true;
+    });
   },
 
   // daftar akun baru dengan kode pendaftaran (dicek aturan Firestore, bukan di sini)

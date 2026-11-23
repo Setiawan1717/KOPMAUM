@@ -58,6 +58,7 @@ const ui = {
   rentalTab: 'kalender', rentalItem: 'r1', calMonth: TODAY.slice(0, 7), publicView: false, bookingFilter: 'aktif',
   feeMonth: TODAY.slice(0, 7), feeTab: 'saya',
   poinTab: 'saya', poinTimer: null,
+  gajiTab: 'saya', jadwalMulai: '', laporanBulan: TODAY.slice(0, 7),
   jejakModul: 'semua',
 };
 const save = () => Store.save(db);
@@ -158,7 +159,7 @@ const NAV = [
   { id: 'stok', label: 'Stok Mart', icon: 'box', color: 'lime', show: () => stokTersedia() },
   { id: 'rental', label: 'Rental', icon: 'cal', color: 'tangerine', show: () => can.rentalView() },
   { id: 'poin', label: 'Poin', icon: 'star', color: 'grape', show: () => poinTersedia() },
-  { id: 'fee', label: 'Fee & gaji', icon: 'wallet', color: 'pink', show: () => !isLive() },
+  { id: 'fee', label: 'Fee & gaji', icon: 'wallet', color: 'pink', show: () => true, labelFn: () => (isLive() ? 'Gaji jaga' : 'Fee & gaji') },
   { id: 'akun', label: 'Akun & peran', icon: 'shield', color: 'mint', show: () => (isLive() ? Kasir.kelolaAkun : can.akunView()) },
   { id: 'jejak', label: 'Jejak', icon: 'history', color: 'coral', show: () => can.jejak() || can.jejakLive() },
 ];
@@ -286,6 +287,7 @@ function viewDasbor() {
   if (poinTersedia() && (!isLive() || p.nia)) tiles.push(`<a href="#poin" class="tile c-grape"><span class="t-icon">${ic('star')}</span><span class="t-val num">${fmtNum(saldoPoin(meId))}</span><span class="t-lbl">Poin belanjamu</span></a>`);
   if (!isLive()) { const feeBelum = feeOf(meId).filter((f) => !f.lunas).reduce((a, f) => a + f.nominal, 0);
     tiles.push(`<a href="#fee" class="tile c-pink"><span class="t-icon">${ic('wallet')}</span><span class="t-val num">${rp(feeBelum)}</span><span class="t-lbl">Fee belum dibayar</span></a>`); }
+  if (isLive() && Kasir.akun?.username && (Kasir.trxGaji.length || Kasir.penarikan.some((x) => x.uid === Kasir.akun.uid))) tiles.push(`<a href="#fee" class="tile c-pink"><span class="t-icon">${ic('wallet')}</span><span class="t-val num">${rp(Kasir.gajiSaya.saldo)}</span><span class="t-lbl">Saldo gaji jagamu</span></a>`);
   if (can.anggotaLiveView()) tiles.push(`<a href="#anggota" class="tile c-sky"><span class="t-icon">${ic('users')}</span><span class="t-val num">${Kasir.anggota.filter((x) => x.aktif !== false).length}</span><span class="t-lbl">Anggota terdaftar</span></a>`);
   if (can.rentalView()) {
     const aktif = db.booking.filter((b) => AKTIF.includes(b.status)).length;
@@ -790,7 +792,90 @@ function feeRow(f, showName) {
     <div class="end"><b class="num">${rp(f.nominal)}</b>${can.feeEdit() ? `<button class="btn btn-sm ${f.lunas ? 'btn-ghost' : 'btn-soft c-mint'}" data-act="fee-toggle" data-id="${f.id}">${f.lunas ? 'Dibayar ✓' : 'Tandai dibayar'}</button>` : `<span class="pill c-${f.lunas ? 'mint' : 'sun'}">${f.lunas ? 'Dibayar' : 'Belum dibayar'}</span>`}</div>
   </div>`;
 }
+/* ---------- Gaji jaga (akun sungguhan) ---------- */
+const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const tglLabel = (t) => { const d = parseYmd(t); return `${HARI[d.getDay()]}, ${d.getDate()} ${BLN[d.getMonth()]}`; };
+const senin = (t) => { const d = parseYmd(t); return addDays(t, -((d.getDay() + 6) % 7)); };
+const namaAkun = (u) => { const a = Kasir.akunList.find((x) => x.username === u); return a?.nama || (a?.nia && anggotaByNia(a.nia)?.nama) || u; };
+const STATUS_TARIK = { diajukan: ['Menunggu', 'sun'], dibayar: ['Dibayar', 'mint'], ditolak: ['Ditolak', 'coral'], dibatalkan: ['Dibatalkan', 'sky'] };
+const jadwalPada = (t) => Kasir.jadwal.find((j) => j.tanggal === t);
+const pillStatus = (st) => { const [l, c] = STATUS_TARIK[st] || [st, 'sky']; return `<span class="pill c-${c}">${esc(l)}</span>`; };
+function barisTarik(p, kelola) {
+  const bisaProses = kelola && p.status === 'diajukan' && p.uid !== Kasir.akun?.uid;
+  const bisaBatal = !kelola && p.status === 'diajukan' && p.uid === Kasir.akun?.uid;
+  return `<div class="row"><span class="stripe c-${(STATUS_TARIK[p.status] || [])[1] || 'sky'}"></span><div class="grow"><div class="title">${kelola ? esc(namaAkun(p.username)) + ' · ' : ''}<span class="num">${rp(p.nominal)}</span></div>
+    <div class="sub">Diajukan ${p.diajukan ? waktu(p.diajukan) : 'baru saja'}${p.diprosesOleh ? ` · ${STATUS_TARIK[p.status]?.[0].toLowerCase() || p.status} oleh ${esc(p.diprosesOleh)}${p.diproses ? ' ' + waktu(p.diproses) : ''}` : ''}${p.alasan ? ` · ${esc(p.alasan)}` : ''}</div></div>
+    <div class="end">${pillStatus(p.status)}${bisaProses ? `<button class="btn btn-primary btn-sm" data-act="tarik-proses" data-id="${esc(p.id)}">Proses</button>` : ''}${bisaBatal ? `<button class="btn btn-ghost btn-sm" data-act="tarik-batal" data-id="${esc(p.id)}">Batalkan</button>` : ''}</div></div>`;
+}
+function viewGajiLive() {
+  const tabs = [['saya', 'Gajiku'], ['jadwal', 'Jadwal'], ...(Kasir.bacaLaporan ? [['laporan', 'Laporan']] : []), ...(Kasir.prosesGaji ? [['tarik', 'Penarikan']] : [])];
+  if (!tabs.find((t) => t[0] === ui.gajiTab)) ui.gajiTab = 'saya';
+  const menunggu = Kasir.prosesGaji ? Kasir.penarikan.filter((p) => p.status === 'diajukan').length : 0;
+  const errs = ['gajiError', 'jadwalError', 'penarikanError'].map((k) => Kasir[k]).filter(Boolean);
+  let body = '';
+  if (ui.gajiTab === 'saya') {
+    const g = Kasir.gajiSaya; const u = Kasir.akun.username;
+    const nanti = Kasir.jadwal.filter((j) => j.tanggal >= TODAY && (j.petugas || []).includes(u)).slice(0, 5);
+    const milik = Kasir.penarikan.filter((p) => p.uid === Kasir.akun.uid);
+    body = `<div class="tiles">
+      <div class="tile c-pink"><span class="t-icon">${ic('wallet')}</span><span class="t-val num">${rp(g.saldo)}</span><span class="t-lbl">Saldo bisa ditarik</span></div>
+      <div class="tile c-mint"><span class="t-icon">${ic('check')}</span><span class="t-val num">${rp(g.total)}</span><span class="t-lbl">Total gaji · ${g.hari.length} hari jaga</span></div>
+      <div class="tile c-sun"><span class="t-icon">${ic('history')}</span><span class="t-val num">${rp(g.dibayar)}</span><span class="t-lbl">Sudah ditarik${g.diajukan ? ` · ${rp(g.diajukan)} menunggu` : ''}</span></div>
+    </div>
+    <section class="card c-pink"><div class="card-head"><h2>Tarik gaji</h2></div>
+      <p class="small muted">Gajimu ${Kasir.GAJI_PERSEN}% dari penjualan yang kamu layani di kasir dengan akun <b>${esc(u)}</b>, dihitung per hari. Saldo bisa ditarik kapan saja, minimal ${rp(Kasir.MIN_TARIK)}. Uang diserahkan ketua atau bendahara.</p>
+      ${g.saldo >= Kasir.MIN_TARIK ? `<form class="toolbar" data-form="tarik" style="margin-top:10px"><div class="field" style="flex:1 1 180px"><label for="tarikNominal">Nominal</label><input class="input num" id="tarikNominal" name="nominal" type="number" inputmode="numeric" min="${Kasir.MIN_TARIK}" max="${g.saldo}" step="500" value="${g.saldo}" required></div><button class="btn btn-primary" type="submit" id="tarikBtn">${ic('wallet', 'icon-sm')}Ajukan penarikan</button></form>`
+        : `<div class="notice c-sun" style="margin-top:10px">${ic('alert')}<span>Saldo belum mencapai ${rp(Kasir.MIN_TARIK)}. Kurang ${rp(Kasir.MIN_TARIK - g.saldo)} lagi.</span></div>`}
+    </section>
+    ${nanti.length ? `<section class="card c-sky"><div class="card-head"><h2>Jadwal jagamu</h2></div><div class="chips">${nanti.map((j) => `<span class="pill c-sky">${j.tanggal === TODAY ? 'Hari ini' : tglLabel(j.tanggal)}</span>`).join('')}</div></section>` : ''}
+    ${milik.length ? `<section class="card"><div class="card-head"><h2>Penarikanku</h2></div><div class="list">${milik.map((p) => barisTarik(p, false)).join('')}</div></section>` : ''}
+    <section class="card"><div class="card-head"><h2>Gaji per hari</h2></div><div class="list">${g.hari.length ? g.hari.slice(0, 60).map((d) => `<div class="row"><span class="stripe c-pink"></span><div class="grow"><div class="title">${tglLabel(d.tanggal)}</div><div class="sub">${d.n} transaksi · penjualan ${rp(d.penjualan)}</div></div><div class="end"><b class="num" style="color:var(--pink-ink)">+${rp(d.gaji)}</b></div></div>`).join('') : empty('wallet', 'Belum ada penjualan dengan akunmu di kasir. Gaji muncul otomatis setelah kamu jaga dan melayani pembeli.', 'pink')}</div></section>`;
+  } else if (ui.gajiTab === 'jadwal') {
+    const mulai = ui.jadwalMulai || senin(TODAY);
+    const hari = Array.from({ length: 7 }, (_, i) => addDays(mulai, i));
+    const u = Kasir.akun.username;
+    body = `<div class="toolbar" style="justify-content:space-between"><button class="btn btn-soft btn-sm" data-act="jadwal-geser" data-n="-7">‹ Minggu lalu</button><b class="small">${tglLabel(hari[0]).split(', ')[1]} – ${tglLabel(hari[6]).split(', ')[1]}</b><button class="btn btn-soft btn-sm" data-act="jadwal-geser" data-n="7">Minggu depan ›</button></div>
+    ${mulai !== senin(TODAY) ? `<button class="btn btn-ghost btn-sm" data-act="jadwal-geser" data-n="0">Kembali ke minggu ini</button>` : ''}
+    <div class="list">${hari.map((t) => { const j = jadwalPada(t); const ps = j?.petugas || []; const aku = ps.includes(u);
+      return `<div class="row"><span class="stripe c-${t === TODAY ? 'pink' : aku ? 'sky' : 'lime'}"></span><div class="grow"><div class="title">${tglLabel(t)}${t === TODAY ? ' · <span class="pill c-pink">Hari ini</span>' : ''}</div>
+        <div class="chips" style="margin-top:6px">${ps.length ? ps.map((x) => `<span class="pill c-${x === u ? 'sky' : 'lime'}">${esc(namaAkun(x))}</span>`).join('') : '<span class="small muted">Belum ada petugas</span>'}</div>${j?.catatan ? `<div class="sub" style="margin-top:4px">${esc(j.catatan)}</div>` : ''}</div>
+        ${Kasir.aturJadwal ? `<div class="end"><button class="btn btn-soft btn-sm" data-act="jadwal-ubah" data-t="${t}">Atur</button></div>` : ''}</div>`; }).join('')}</div>
+    <p class="small muted">${Kasir.aturJadwal ? 'Kamu bisa mengatur jadwal (bidang usaha / ketua). Setiap perubahan tercatat di Jejak.' : 'Jadwal diatur bidang usaha dan ketua.'}</p>`;
+  } else if (ui.gajiTab === 'laporan') {
+    Kasir.muatLaporan(ui.laporanBulan);
+    const bulanList = Array.from({ length: 6 }, (_, i) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i); return ymd(d).slice(0, 7); });
+    const hari = Kasir.gajiHarian(Kasir.trxLaporan);
+    const per = {}; hari.forEach((d) => { const x = (per[d.kasir] ??= { hari: 0, penjualan: 0, gaji: 0 }); x.hari++; x.penjualan += d.penjualan; x.gaji += d.gaji; });
+    const rows = Object.entries(per).sort((a, b) => b[1].gaji - a[1].gaji);
+    const tot = rows.reduce((a, [, v]) => ({ p: a.p + v.penjualan, g: a.g + v.gaji }), { p: 0, g: 0 });
+    const tanggal = [...new Set([...hari.map((d) => d.tanggal), ...Kasir.jadwal.filter((j) => j.tanggal.startsWith(ui.laporanBulan) && j.tanggal <= TODAY && (j.petugas || []).length).map((j) => j.tanggal)])].sort().reverse();
+    body = `<div class="toolbar"><div class="field"><label for="lapBulan">Bulan</label><select class="input" id="lapBulan" data-live="lapbulan">${bulanList.map((m) => `<option value="${m}" ${m === ui.laporanBulan ? 'selected' : ''}>${bulanLabel(m)}</option>`).join('')}</select></div></div>
+    ${Kasir.laporanError ? `<div class="notice c-coral">${ic('alert')}<span>Laporan gagal dimuat: ${esc(Kasir.laporanError)}</span></div>` : ''}
+    ${!Kasir.laporanSiap ? empty('history', 'Memuat transaksi bulan ini…') : `
+    <div class="tiles"><div class="tile c-lime"><span class="t-val num">${rp(tot.p)}</span><span class="t-lbl">Penjualan ${bulanLabel(ui.laporanBulan)}</span></div><div class="tile c-pink"><span class="t-val num">${rp(tot.g)}</span><span class="t-lbl">Gaji jaga (${Kasir.GAJI_PERSEN}%)</span></div></div>
+    <section class="card c-pink"><div class="card-head"><h2>Per petugas</h2></div>${rows.length ? `<div class="table-wrap"><table><thead><tr><th>Petugas</th><th class="r">Hari</th><th class="r">Penjualan</th><th class="r">Gaji</th></tr></thead><tbody>${rows.map(([k, v]) => `<tr><td><b>${esc(namaAkun(k) || '(tanpa nama)')}</b></td><td class="r num">${v.hari}</td><td class="r num">${rp(v.penjualan)}</td><td class="r num">${rp(v.gaji)}</td></tr>`).join('')}</tbody></table></div>` : empty('wallet', 'Belum ada penjualan bulan ini.', 'pink')}</section>
+    <section class="card"><div class="card-head"><h2>Per hari</h2><span class="small muted">jadwal vs yang melayani</span></div><div class="list">${tanggal.length ? tanggal.map((t) => {
+      const jd = jadwalPada(t)?.petugas || []; const jual = hari.filter((d) => d.tanggal === t);
+      const luar = jual.filter((d) => !jd.includes(d.kasir)); const absen = jd.filter((x) => !jual.some((d) => d.kasir === x));
+      return `<div class="row"><span class="stripe c-${luar.length || absen.length ? 'sun' : 'lime'}"></span><div class="grow"><div class="title">${tglLabel(t)}</div>
+        <div class="sub">Jadwal: ${jd.length ? jd.map((x) => esc(namaAkun(x))).join(', ') : '—'}</div>
+        <div class="chips" style="margin-top:6px">${jual.map((d) => `<span class="pill c-${jd.includes(d.kasir) ? 'lime' : 'sun'}">${esc(namaAkun(d.kasir) || '?')} · ${rp(d.penjualan)} → ${rp(d.gaji)}</span>`).join('')}${absen.map((x) => `<span class="pill c-coral">${esc(namaAkun(x))} · tanpa penjualan</span>`).join('')}</div>
+        ${luar.length ? `<div class="sub" style="margin-top:4px">Melayani di luar jadwal: ${luar.map((d) => esc(namaAkun(d.kasir))).join(', ')}</div>` : ''}</div></div>`; }).join('') : empty('cal', 'Belum ada jadwal atau penjualan bulan ini.')}</div></section>`}`;
+  } else {
+    const tunggu = Kasir.penarikan.filter((p) => p.status === 'diajukan');
+    const selesai = Kasir.penarikan.filter((p) => p.status !== 'diajukan');
+    body = `<section class="card c-sun"><div class="card-head"><h2>Menunggu diproses</h2><span class="pill">${tunggu.length}</span></div><div class="list">${tunggu.length ? tunggu.map((p) => barisTarik(p, true)).join('') : empty('check', 'Tidak ada penarikan yang menunggu.', 'mint')}</div>
+      <p class="small muted" style="margin-top:8px">Tekan Proses untuk mengecek saldo petugas sebelum menyerahkan uang. Penarikanmu sendiri diproses pengurus lain.</p></section>
+    <section class="card"><div class="card-head"><h2>Riwayat</h2></div><div class="list">${selesai.length ? selesai.slice(0, 100).map((p) => barisTarik(p, true)).join('') : empty('history', 'Belum ada riwayat penarikan.')}</div></section>`;
+  }
+  return `${pageHead('Gaji jaga', `Petugas jaga mendapat ${Kasir.GAJI_PERSEN}% dari penjualan yang dia layani setiap hari. Gaji ditabung dan bisa ditarik kapan saja, minimal ${rp(Kasir.MIN_TARIK)}.`)}
+  ${errs.length ? `<div class="notice c-coral">${ic('alert')}<span>Sebagian data gaji gagal dimuat: ${esc(errs[0])}</span></div>` : ''}
+  <div class="seg">${tabs.map(([k, l]) => `<button class="${ui.gajiTab === k ? 'on' : ''}" data-act="gaji-tab" data-k="${k}">${l}${k === 'tarik' && menunggu ? ` (${menunggu})` : ''}</button>`).join('')}</div>
+  ${body}`;
+}
+
 function viewFee() {
+  if (isLive()) return viewGajiLive();
   const tabs = [['saya', 'Fee saya'], ...(can.feeAll() ? [['rekap', 'Rekap bulanan'], ['semua', 'Semua fee']] : [])];
   if (!tabs.find((t) => t[0] === ui.feeTab)) ui.feeTab = 'saya';
   let body = '';
@@ -1125,6 +1210,36 @@ const ACT = {
   },
 
   'fee-tab': (el) => { ui.feeTab = el.dataset.k; render(); },
+  'gaji-tab': (el) => { ui.gajiTab = el.dataset.k; render(); },
+  'jadwal-geser': (el) => { const n = +el.dataset.n; ui.jadwalMulai = n ? addDays(ui.jadwalMulai || senin(TODAY), n) : ''; render(); },
+  'jadwal-ubah': (el) => {
+    const t = el.dataset.t; const j = jadwalPada(t); const dipilih = j?.petugas || [];
+    const calon = Kasir.akunList.filter((a) => ['admin', 'kasir'].includes(a.role) || (a.hub || []).includes('petugas_jaga') || dipilih.includes(a.username));
+    const pilihan = calon.length ? `<div class="field"><span class="label">Petugas jaga</span><div class="chips">${calon.map((a) => `<label class="pill c-lime" style="cursor:pointer"><input type="checkbox" name="petugas" value="${esc(a.username)}" ${dipilih.includes(a.username) ? 'checked' : ''}> ${esc(namaAkun(a.username))}</label>`).join('')}</div><span class="hint">Yang muncul: akun kasir dan akun berperan petugas jaga.</span></div>`
+      : `<div class="field"><label for="jdManual">Nama pengguna petugas</label><input class="input" id="jdManual" name="manual" value="${esc(dipilih.join(', '))}" placeholder="contoh: adit, sinta"><span class="hint">Pisahkan dengan koma. Harus sama dengan nama pengguna login kasir.</span></div>`;
+    openModal(`Jadwal ${tglLabel(t)}`, `<form class="form" data-form="jadwal" id="jadwalForm"><input type="hidden" name="t" value="${t}">${pilihan}
+      <div class="field"><label for="jdCatatan">Catatan (opsional)</label><input class="input" id="jdCatatan" name="catatan" maxlength="200" value="${esc(j?.catatan || '')}" placeholder="contoh: shift pagi 08.00–12.00"></div><div id="jdMsg"></div></form>`, 'lime',
+      `<button class="btn btn-ghost" data-act="close-modal">Batal</button><button class="btn btn-primary" form="jadwalForm" type="submit" id="jdBtn">Simpan jadwal</button>`);
+  },
+  'tarik-batal': async (el) => {
+    const p = Kasir.penarikan.find((x) => x.id === el.dataset.id); if (!p || !confirm(`Batalkan pengajuan ${rp(p.nominal)}?`)) return;
+    try { await Kasir.prosesPenarikan(p, 'dibatalkan'); toast('Pengajuan dibatalkan', 'sky'); render(); } catch (e) { toast(Kasir._pesan(e), 'coral'); }
+  },
+  'tarik-proses': async (el) => {
+    const p = Kasir.penarikan.find((x) => x.id === el.dataset.id); if (!p) return;
+    openModal(`Penarikan ${esc(namaAkun(p.username))}`, `<div id="cekSaldo">${empty('history', 'Mengecek saldo dari transaksi kasir…')}</div>`, 'pink');
+    let g; try { g = Kasir.ringkasGaji(await Kasir.trxMilik(p.username), p.username); } catch (e) { $('#cekSaldo').innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir._pesan(e))}</span></div>`; return; }
+    const sebelum = g.saldo + p.nominal; const cukup = sebelum >= p.nominal;
+    if (!$('#cekSaldo')) return;
+    $('#cekSaldo').innerHTML = `<form class="form" data-form="prosesTarik" id="prosesForm"><input type="hidden" name="id" value="${esc(p.id)}">
+      <div class="preview"><div class="line"><span>Diminta</span><span class="total num">${rp(p.nominal)}</span></div>
+      <div class="line small"><span>Total gaji ${esc(p.username)}</span><span class="num">${rp(g.total)} · ${g.hari.length} hari</span></div>
+      <div class="line small"><span>Sudah ditarik</span><span class="num">${rp(g.dibayar)}</span></div>
+      <div class="line small"><span>Saldo sebelum penarikan ini</span><span class="num">${rp(sebelum - (g.diajukan - p.nominal))}</span></div></div>
+      ${cukup ? `<div class="notice c-mint">${ic('check')}<span>Saldo cukup. Serahkan uangnya, lalu tekan "Sudah dibayar".</span></div>` : `<div class="notice c-coral">${ic('alert')}<span>Saldo tidak cukup untuk nominal ini. Sebaiknya ditolak.</span></div>`}
+      <div class="field"><label for="tarikAlasan">Catatan / alasan (wajib kalau ditolak)</label><input class="input" id="tarikAlasan" name="alasan" maxlength="200"></div><div id="ptMsg"></div>
+      <div class="toolbar" style="justify-content:flex-end"><button class="btn btn-ghost" type="submit" name="aksi" value="ditolak">Tolak</button><button class="btn btn-primary" type="submit" name="aksi" value="dibayar" ${cukup ? '' : 'disabled'}>Sudah dibayar</button></div></form>`;
+  },
   'fee-baru': () => openModal('Catat fee', `
     <form class="form" data-form="fee" id="feeForm">
       <div class="field"><label for="feUser">Penerima</label><select class="input" id="feUser" name="userId">${[...db.profil].sort((a, b) => a.nama.localeCompare(b.nama)).map((p) => `<option value="${p.id}">${esc(p.nama)} (${p.status})</option>`).join('')}</select></div>
@@ -1237,6 +1352,7 @@ const LIVE = {
     $('#opSummary').textContent = n ? `${n} barang dihitung, ${beda} selisih (${Math.round((beda / db.barangMart.length) * 100)}% item).` : 'Belum ada yang dihitung.';
   },
   feemonth: (el) => { ui.feeMonth = el.value; render(); },
+  lapbulan: (el) => { ui.laporanBulan = el.value; render(); },
   rolechip: (el) => el.closest('.chip').classList.toggle('on', el.checked),
 };
 
@@ -1294,6 +1410,30 @@ const FORM = {
       if (baru) { ui.q.anggotaLive = ''; ui.anggotaLiveFilter = 'semua'; }
       render();
     } catch (e) { btn.disabled = false; btn.textContent = baru ? 'Tambah anggota' : 'Simpan perubahan'; err(Kasir._pesan(e)); }
+  },
+  tarik: async (f) => {
+    const n = parseInt(f.nominal.value, 10); const g = Kasir.gajiSaya; const btn = $('#tarikBtn');
+    if (!Number.isInteger(n) || n < Kasir.MIN_TARIK) { toast(`Minimal penarikan ${rp(Kasir.MIN_TARIK)}`, 'coral'); return; }
+    if (n > g.saldo) { toast(`Saldomu hanya ${rp(g.saldo)}`, 'coral'); return; }
+    btn.disabled = true;
+    try { await Kasir.ajukanPenarikan(n); toast(`Penarikan ${rp(n)} diajukan. Ambil uangnya ke ketua atau bendahara.`, 'pink'); render(); }
+    catch (e) { btn.disabled = false; toast(Kasir._pesan(e), 'coral'); }
+  },
+  prosesTarik: async (f, ev) => {
+    const aksi = ev.submitter?.value; const p = Kasir.penarikan.find((x) => x.id === f.id.value); const alasan = f.alasan.value.trim();
+    if (!p || !aksi) return;
+    if (aksi === 'ditolak' && alasan.length < 3) { $('#ptMsg').innerHTML = `<div class="notice c-coral">${ic('alert')}<span>Tulis alasan penolakan.</span></div>`; return; }
+    f.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    try { await Kasir.prosesPenarikan(p, aksi, alasan); closeModal(); toast(aksi === 'dibayar' ? `Penarikan ${rp(p.nominal)} ditandai dibayar` : 'Penarikan ditolak', aksi === 'dibayar' ? 'mint' : 'sun'); render(); }
+    catch (e) { f.querySelectorAll('button').forEach((b) => { b.disabled = false; }); $('#ptMsg').innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir._pesan(e))}</span></div>`; }
+  },
+  jadwal: async (f) => {
+    const t = f.t.value; const btn = $('#jdBtn');
+    const petugas = f.manual ? f.manual.value.split(',').map((x) => x.trim().toLowerCase()).filter(Boolean) : [...f.querySelectorAll('[name=petugas]:checked')].map((i) => i.value);
+    if (petugas.length > 10) { $('#jdMsg').innerHTML = `<div class="notice c-coral">${ic('alert')}<span>Maksimal 10 petugas per hari.</span></div>`; return; }
+    btn.disabled = true;
+    try { const ok = await Kasir.simpanJadwal(t, [...new Set(petugas)], f.catatan.value.trim(), tglLabel(t)); closeModal(); toast(ok ? `Jadwal ${tglLabel(t)} tersimpan` : 'Tidak ada yang berubah', 'lime'); render(); }
+    catch (e) { btn.disabled = false; $('#jdMsg').innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir._pesan(e))}</span></div>`; }
   },
   lupa: (f) => { closeModal(); toast(`Tautan atur ulang dikirim ke ${esc(f.email.value)} (simulasi)`, 'sky'); },
   booking: (f) => {
@@ -1416,7 +1556,7 @@ window.addEventListener('hashchange', () => { closeModal(); render(); window.scr
   if (meId === '') meId = null;
   Kasir.onChange = () => {
     if (isLive() && !Kasir.on) { if (!$('#loginForm')) render(); return; }
-    if (!me() || !['stok', 'dasbor', 'poin', 'anggota', 'akun', 'jejak'].includes(ui.view) || $('#modalBack')) return;
+    if (!me() || !['stok', 'dasbor', 'poin', 'anggota', 'akun', 'jejak', 'fee'].includes(ui.view) || $('#modalBack')) return;
     const a = document.activeElement;
     if (a && a.matches('input, select, textarea') && $('#main')?.contains(a)) { if ($('#listStok')) $('#listStok').innerHTML = listStok(); if ($('#listAnggotaLive')) $('#listAnggotaLive').innerHTML = listAnggotaLive(); return; }
     render();

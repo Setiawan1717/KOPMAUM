@@ -1,6 +1,6 @@
 # Aturan keamanan Firestore (project kopma-um)
 
-`firestore.rules` mengunci database web kasir supaya aman dipakai bersama Kopma Hub. Aturan ini disusun dari semua operasi yang ada di kode web kasir, dan sudah diuji di Firestore Emulator: 20 alur kasir tetap jalan dan 17 percobaan penyalahgunaan ditolak. Aturan koleksi `anggota` diuji terpisah (19 kasus), begitu juga pendaftaran dengan kode, perbarui data sendiri, dan pengaturan peran (38 kasus). Rumus poin bersama dan jejak wajib diuji 44 kasus, ditambah uji alur di browser. Web kasir versi perbaikan juga sudah diuji ujung ke ujung (login, jualan dengan NIA, stok berkurang) terhadap aturan ini.
+`firestore.rules` mengunci database web kasir supaya aman dipakai bersama Kopma Hub. Aturan ini disusun dari semua operasi yang ada di kode web kasir, dan sudah diuji di Firestore Emulator: 20 alur kasir tetap jalan dan 17 percobaan penyalahgunaan ditolak. Aturan koleksi `anggota` diuji terpisah (19 kasus), begitu juga pendaftaran dengan kode, perbarui data sendiri, dan pengaturan peran (38 kasus). Rumus poin bersama dan jejak wajib diuji 44 kasus; gaji jaga, jadwal, dan penarikan 55 kasus; ditambah uji alur di browser. Web kasir versi perbaikan juga sudah diuji ujung ke ujung (login, jualan dengan NIA, stok berkurang) terhadap aturan ini.
 
 ## Masalah yang ditutup
 
@@ -73,6 +73,16 @@ Setiap perubahan yang dikirim Kopma Hub ke `anggota`, `users` (peran, penghubung
 Yang bisa membaca: ketua, sekretaris, bendahara, dan admin kasir. Perubahan oleh admin kasir dari web kasir dan dari Firebase Console tidak tercatat, karena tidak lewat Kopma Hub.
 
 **Penting saat memasang:** aturan baru dan kode Kopma Hub baru harus dipasang berdekatan. Kode lama ditolak oleh aturan baru (karena tidak menulis jejak), dan kode baru ditolak oleh aturan lama. Publish aturan setelah GitHub Pages selesai memperbarui situs (sekitar 1 menit setelah push), lalu minta pengurus memuat ulang Kopma Hub.
+
+## Gaji jaga, jadwal, dan penarikan
+
+- **Gaji** tidak disimpan, tapi dihitung dari `transactions`: 1% total penjualan per hari untuk akun yang tercatat di kolom `kasir`. Karena itu setiap petugas harus login kasir dengan akunnya sendiri.
+- **Membaca transaksi**: selain kasir/admin, sekarang ketua, sekretaris, bendahara, dan bidang usaha boleh membaca (untuk laporan), dan setiap akun boleh membaca transaksi yang dia layani sendiri. Tetap tidak ada yang bisa mengubah transaksi dari Kopma Hub.
+- **`jadwal_jaga/{YYYY-MM-DD}`**: daftar nama pengguna petugas (maksimal 10) dan catatan. Diatur bidang usaha, ketua, dan admin; dibaca semua akun terdaftar; tidak bisa dihapus.
+- **`penarikan_gaji`**: petugas mengajukan atas namanya sendiri (bilangan bulat Rp10.000 sampai Rp5.000.000, status awal `diajukan`). Ketua, bendahara, atau admin mengubahnya menjadi `dibayar` atau `ditolak`, tetapi tidak untuk penarikannya sendiri. Pemilik bisa membatalkan selama masih `diajukan`. Penarikan yang sudah diproses tidak bisa diubah lagi atau dihapus.
+- Aturan Firestore tidak bisa menjumlah saldo, jadi kecukupan saldo dicek aplikasi saat mengajukan, dan dicek ulang dari transaksi saat ketua/bendahara menekan **Proses**.
+- **Daftar akun** (`users`) kini juga bisa dibaca bendahara dan bidang usaha, untuk memilih petugas di jadwal dan menampilkan nama. Mengubah peran tetap hanya ketua dan sekretaris.
+- Semua perubahan jadwal dan penarikan tercatat di Jejak.
 
 ## Membuat akun kasir baru
 
