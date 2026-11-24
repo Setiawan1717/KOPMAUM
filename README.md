@@ -31,13 +31,13 @@ Tambahan: halaman **Jejak** (siapa mengubah apa), **ekspor CSV** untuk PHI, mode
 
 ## Login sungguhan dan data anggota
 
-Halaman masuk Kopma Hub memakai **akun Kopma** (akun Firebase yang sama dengan web kasir). Akun demo tetap ada di bagian bawah untuk mencoba tanpa data asli.
+Halaman masuk Kopma Hub memakai **akun Kopma** (akun yang sama dengan web kasir, tersimpan di Supabase). Akun demo tetap ada di bagian bawah untuk mencoba tanpa data asli.
 
 - **Data anggota** tersimpan di Firestore koleksi `anggota` (ID dokumen = NIA), jadi sama di semua perangkat.
 - **Ketua dan sekretaris** bisa menambah dan mengubah. Bendahara dan admin kasir hanya melihat. NIA tidak bisa ganda dan data tidak bisa dihapus (cukup ditandai tidak aktif).
 - Poin dari kasir otomatis tampil dengan nama anggota.
 - **Rumus poin** disimpan di Firestore (`pengaturan/poin`), sama di semua perangkat. Ketua, bendahara, dan admin kasir bisa mengubahnya di halaman Poin.
-- Semua modul kini memakai data asli di Firebase saat login dengan akun sungguhan. Data contoh hanya ada di mode demo.
+- Semua modul memakai data asli di database Supabase `kopma-um` saat login dengan akun sungguhan. Data contoh hanya ada di mode demo.
 - **Kopma Rental**: inventaris dan harga diatur bidang usaha dan ketua; booking dicatat bidang usaha, petugas jaga, dan pengurus inti, lengkap dengan pembayaran (belum bayar / DP / lunas) dan jaminan. Sistem menolak booking kalau unit tidak cukup.
 - **Halaman publik `#sewa`** (contoh: `.../index.html#sewa`) bisa dibuka tanpa login: daftar barang, harga, dan kalender tersedia/penuh, tanpa nama, nomor, bayar, atau jaminan penyewa.
 - **Gaji jaga**: petugas mendapat 1% dari penjualan yang dia layani dengan akun kasirnya sendiri, dihitung per hari dari transaksi kasir. Gaji ditabung dan bisa ditarik kapan saja (minimal Rp10.000): petugas mengajukan, ketua atau bendahara menyerahkan uang lalu menandai dibayar. Jadwal jaga diatur bidang usaha dan ketua, dilihat semua akun. Laporan bulanan (jadwal vs yang melayani, penjualan, gaji per petugas) untuk ketua, sekretaris, bendahara, dan bidang usaha.
@@ -45,11 +45,11 @@ Halaman masuk Kopma Hub memakai **akun Kopma** (akun Firebase yang sama dengan w
 - **Daftar akun sendiri** di halaman masuk dengan kode pendaftaran (kodenya disimpan di Firestore, bukan di repo) dan NIA yang sudah terdaftar.
 - **Profil saya**: setiap orang memperbarui datanya sendiri dan melihat poinnya.
 - **Akun & peran**: ketua dan sekretaris mengatur peran akun lain langsung dari Kopma Hub.
-- Langkah awal dan detail aturan: lihat `firebase/README.md`.
+- Skema, hak akses, dan pengaturan database: lihat `supabase/README.md`. Sejak 25 Nov 2026 Firebase hanya arsip (baca saja); `firebase/` disimpan sebagai riwayat.
 
 ## Sambungan ke web kasir
 
-Modul Stok bisa membaca data langsung dari web kasir (repo `KasirKopmaUM2026`, Firebase project `kopma-um`).
+Modul Stok bisa membaca data langsung dari web kasir (repo `KasirKopmaUM2026`, database Supabase `kopma-um` yang sama).
 
 - Buka **Stok Mart**, lalu masuk dengan akun yang dipakai di web kasir (hanya peran bidang usaha, PHI, atau super admin yang melihat form ini).
 - **Baca saja:** `js/kasir.js` hanya memakai `onSnapshot` dan `getDocs`. Tidak ada fungsi tulis Firestore, jadi data kasir tidak bisa berubah dari Kopma Hub.
@@ -57,7 +57,7 @@ Modul Stok bisa membaca data langsung dari web kasir (repo `KasirKopmaUM2026`, F
 - **Poin otomatis:** transaksi kasir yang diisi NIA anggota langsung menjadi poin (`total ÷ rumus`, dibulatkan ke bawah per transaksi). Ada *Cek NIA* dan peringkat poin. Transaksi sebelum isian NIA ada tidak dihitung.
 - **Batas minimum** tiap produk disimpan di Kopma Hub (browser), tidak ditulis ke data produk kasir.
 - Tombol **Cadangkan data kasir** mengunduh semua produk, transaksi, pengeluaran, dan modal harian sebagai file JSON.
-- Fitur ini tidak jalan di pratinjau claude.ai karena pratinjau memblokir koneksi ke Firebase. Buka dari hosting (Netlify/Vercel/GitHub Pages) atau dari file lokal.
+- Fitur ini tidak jalan di pratinjau claude.ai karena pratinjau memblokir koneksi ke database. Buka dari hosting (Netlify/Vercel/GitHub Pages) atau dari file lokal.
 
 ## Struktur
 
@@ -66,7 +66,7 @@ index.html          halaman utama
 css/style.css       tampilan (palet 8 warna, satu warna per modul)
 js/data.js          data contoh + penyimpanan demo
 js/app.js           tampilan, hak akses, dan logika semua modul
-js/kasir.js         sambungan baca-saja ke Firebase web kasir
+js/kasir.js         lapisan data ke Supabase (bentuk objek Kasir)
 supabase/schema.sql 9 tabel, aturan RLS, trigger cek booking, view jadwal_sewa_publik
 ```
 

@@ -1,3 +1,5 @@
+> **Arsip.** Sejak 25 November 2026 Kopma Hub dan web kasir memakai Supabase (lihat `supabase/README.md`). Firestore dikunci baca-saja dan disimpan sebagai arsip; aturan di folder ini adalah riwayat.
+
 # Aturan keamanan Firestore (project kopma-um)
 
 `firestore.rules` mengunci database web kasir supaya aman dipakai bersama Kopma Hub. Aturan ini disusun dari semua operasi yang ada di kode web kasir, dan sudah diuji di Firestore Emulator: 20 alur kasir tetap jalan dan 17 percobaan penyalahgunaan ditolak. Aturan koleksi `anggota` diuji terpisah (19 kasus), begitu juga pendaftaran dengan kode, perbarui data sendiri, dan pengaturan peran (38 kasus). Rumus poin bersama dan jejak wajib diuji 44 kasus; gaji jaga, jadwal, dan penarikan 55 kasus; Kopma Rental 50 kasus; ditambah uji alur di browser. Web kasir versi perbaikan juga sudah diuji ujung ke ujung (login, jualan dengan NIA, stok berkurang) terhadap aturan ini.

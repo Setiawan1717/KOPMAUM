@@ -1,6 +1,6 @@
 # Supabase — database baru Kopma Hub & Kasir
 
-Project: **kopma-um** (region Singapura, paket gratis). Menggantikan Firebase secara bertahap; selama belum hari pindah, Kopma Hub dan kasir masih memakai Firebase.
+Project: **kopma-um** (region Singapura, paket gratis). **Dipakai Kopma Hub dan web kasir sejak 25 November 2026** (pindah dari Firebase; data & akun dipindah dengan `impor/`, kata sandi lama tetap berlaku). Firebase kini arsip baca-saja.
 
 ## Isi folder
 
@@ -34,7 +34,7 @@ Semua migrasi sudah terpasang di project kopma-um.
 
 ## Kopma Hub versi Supabase (Tahap 2)
 
-`js/kasir.js` di branch kerja sudah memakai Supabase (bentuk objek `Kasir` sama, tampilan tidak berubah). **Belum digabung ke `main`**: situs yang dipakai pengurus tetap memakai Firebase sampai hari pindah, karena data asli masih di Firebase.
+`js/kasir.js` memakai Supabase (bentuk objek `Kasir` sama, tampilan tidak berubah).
 
 - Halaman langsung tampil setelah akun terbaca; data tiap bagian menyusul (tidak menunggu semuanya).
 - Poin, gaji, saldo, dan laporan diambil sebagai hasil hitungan server.
