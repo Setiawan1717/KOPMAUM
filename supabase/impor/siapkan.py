@@ -2,8 +2,11 @@
 import json, uuid, sys, re, datetime
 D = sys.argv[1]
 fs = json.load(open(f'{D}/data/firestore.json'))['koleksi']
-akun_fb = json.load(open(f'{D}/data/akun.json'))['users']
-SIGNER = open(f'{D}/data/signer_key.txt').read().strip()
+import os
+# akun.json & signer_key.txt hanya perlu saat ada akun baru / kata sandi berubah; tanpa itu akun dilewati
+ADA_AKUN = os.path.exists(f'{D}/data/akun.json') and os.path.exists(f'{D}/data/signer_key.txt')
+akun_fb = json.load(open(f'{D}/data/akun.json'))['users'] if ADA_AKUN else []
+SIGNER = open(f'{D}/data/signer_key.txt').read().strip() if ADA_AKUN else ''
 HASH = dict(n=14, r=8, ss='Bw==')     # mem_cost 14, rounds 8, salt separator Bw==
 uid = lambda jenis, x: str(uuid.uuid5(uuid.NAMESPACE_URL, f'kopma-um/firebase/{jenis}/{x}'))
 ms = lambda v: datetime.datetime.fromtimestamp(int(v) / 1000, datetime.timezone.utc).isoformat() if v else None
@@ -24,7 +27,12 @@ for a in akun_fb:
     akun.append({'id': uid('akun', a['localId']), 'email': a['email'], 'username': u['username'], 'role': u.get('role') or 'anggota', 'hub': hub,
                  'nama': u.get('nama') or '', 'nia': nia, 'dibuat': ms(a.get('createdAt')), 'masuk': ms(a.get('lastSignedInAt')),
                  'hash': f"$fbscrypt$v=1,n={HASH['n']},r={HASH['r']},p=1,ss={HASH['ss']},sk={SIGNER}${a['salt']}${a['passwordHash']}"})
-idakun = {x['username']: x['id'] for x in akun}
+# tautan transaksi → akun kasir: ID akun sama dengan impor sebelumnya (uuid5 dari ID Firebase di dokumen users)
+idakun = {u['username']: uid('akun', u['_id']) for u in fs['users']}
+if not ADA_AKUN:   # anggota untuk NIA akun tetap disiapkan walau akun tidak diimpor ulang
+    for u in fs['users']:
+        nia = (u.get('nia') or '').replace(' ', '').upper()
+        if nia: anggota.append({'nia': nia, 'nama': u.get('nama') or u['username'], 'status': 'pengurus' if u.get('hub') else 'anggota'})
 
 produk = []
 for p in fs['products']:
