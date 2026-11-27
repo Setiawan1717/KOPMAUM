@@ -44,6 +44,7 @@ const I = {
   key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/>',
   user: '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
   sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/>',
+  more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/>',
   send: '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>',
 };
@@ -199,8 +200,8 @@ function render() {
   app().innerHTML = `
   <div class="shell">
     <aside class="sidebar" aria-label="Navigasi utama">
-      <div class="brand"><img src="logo-kopma.png" alt=""><div>Kopma Hub<small>Web internal Kopma UM</small></div></div>
-      ${nav.map((n) => `<a href="#${n.id}" class="nav-item c-${n.color} ${n.id === ui.view ? 'active' : ''}" ${n.id === ui.view ? 'aria-current="page"' : ''}><span class="sq">${ic(n.icon)}</span>${esc(navLabel(n))}</a>`).join('')}
+      <div class="brand"><img src="logo-kopma.png" alt=""><div>Kopma Hub<small>Koperasi Mahasiswa UM</small></div></div>
+      ${[['Usaha', ['dasbor', 'stok', 'rental', 'fee']], ['Organisasi', ['anggota', 'poin', 'akun', 'jejak']]].map(([grp, ids]) => { const isi = nav.filter((n) => ids.includes(n.id)); return isi.length ? `<div class="nav-grp"><div class="eyebrow">${grp}</div>${isi.map((n) => `<a href="#${n.id}" class="nav-item ${n.id === ui.view ? 'active' : ''}" ${n.id === ui.view ? 'aria-current="page"' : ''}>${esc(navLabel(n))}</a>`).join('')}</div>` : ''; }).join('')}
       <div class="grow"></div>
       <button class="me-card" data-act="menu-akun">${avatar(p)}<span><b>${esc(p.nama)}</b><span class="small muted">${esc(roles.filter((r) => r !== 'anggota').map((r) => ROLES[r].short).join(' · ') || 'Anggota')}</span></span></button>
     </aside>
@@ -210,7 +211,7 @@ function render() {
         <div class="spacer"></div>
         <button class="avatar c-${avColor(p.id)}" data-act="menu-akun" aria-label="Menu akun">${esc(inisial(p.nama))}</button>
       </header>
-      <main class="main c-${cur.color}" id="main"><div class="main-inner">${VIEWS[ui.view]()}</div></main>
+      <main class="main c-${cur.color} v-${ui.view}" id="main"><div class="main-inner">${VIEWS[ui.view]()}</div></main>
     </div>
     <nav class="bottomnav" aria-label="Navigasi">
       ${nav.map((n) => `<a href="#${n.id}" class="bn-item c-${n.color} ${n.id === ui.view ? 'active' : ''}"><span class="dot">${ic(n.icon)}</span>${esc(navLabel(n).split(' ')[0])}</a>`).join('')}
@@ -332,7 +333,7 @@ function viewDasbor() {
     <div class="hero-content">
       <span class="eyebrow" style="color:var(--sun)">${tglPanjang(TODAY)}</span>
       <h1>${salam}, ${esc(p.nama.split(' ')[0])}!</h1>
-      <div class="chips">${roles.map((r) => `<span class="pill c-${ROLES[r].color}" style="background:rgba(255,255,255,.14);color:#fff">${esc(ROLES[r].label)}</span>`).join('')}</div>
+      <div class="chips">${roles.map((r) => `<span class="pill c-${ROLES[r].color}">${esc(ROLES[r].label)}</span>`).join('')}</div>
       ${quick.length ? `<div class="actions" style="margin-top:6px">${quick.join('')}</div>` : ''}
     </div>
   </section>
@@ -720,7 +721,7 @@ function riwayatPoinKasir(d, max = 50) {
 }
 function kartuPoinNia(nia, d) {
   const p = anggotaByNia(nia);
-  return `<section class="card c-grape" style="background:linear-gradient(135deg,var(--grape-soft),var(--pink-soft))">
+  return `<section class="card c-grape" >
     <span class="eyebrow">${p ? esc(p.nama) + ' · ' : ''}NIA <span class="num">${esc(nia)}</span></span>
     <div class="bignum num" style="color:var(--grape-ink)">${fmtNum(d?.poin || 0)}</div>
     <p class="muted small" style="margin-top:8px">${d ? `Dari ${d.n} kali belanja senilai ${rp(d.belanja)}. Terakhir ${waktu(d.terakhir)}.` : 'Belum ada belanja dengan NIA ini di kasir.'}</p>
@@ -778,7 +779,7 @@ function viewPoin() {
     const mine = db.poin.filter((x) => x.userId === meId).sort((a, b) => b.waktu.localeCompare(a.waktu));
     const totalBelanja = mine.reduce((a, x) => a + x.belanja, 0);
     body = `<div class="grid grid-2">
-      <section class="card c-grape" style="background:linear-gradient(135deg,var(--grape-soft),var(--pink-soft))">
+      <section class="card c-grape" >
         <span class="eyebrow">Saldo poin</span>
         <div class="bignum num" style="color:var(--grape-ink)">${fmtNum(saldoPoin(meId))}</div>
         <p class="muted small" style="margin-top:8px">Dari ${mine.filter((x) => x.belanja).length} kali belanja senilai ${rp(totalBelanja)}. Setiap ${rp(rate)} belanja = 1 poin.</p>
@@ -960,19 +961,47 @@ function viewFee() {
 
 /* ---------- Akun & peran ---------- */
 const PERAN_HUB = ['ketua', 'sekretaris', 'bendahara', 'bidang_usaha', 'petugas_jaga', 'pengurus'];
+const AK_FILTER = { semua: ['Semua', () => true], pengurus: ['Pengurus', (u) => (u.hub || []).some((r) => r !== 'petugas_jaga')], jaga: ['Petugas jaga', (u) => (u.hub || []).includes('petugas_jaga')], tanpa: ['Tanpa peran', (u) => !(u.hub || []).length] };
+function terakhirJaga(tgl) {
+  if (!tgl) return 'Belum pernah';
+  const hari = Math.round((parseYmd(TODAY) - parseYmd(tgl)) / 864e5);
+  if (hari <= 0) return 'Hari ini'; if (hari === 1) return 'Kemarin'; if (hari < 7) return `${hari} hari lalu`;
+  if (hari < 35) return `${Math.floor(hari / 7)} minggu lalu`;
+  const d = parseYmd(tgl); return `${d.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'][d.getMonth()]} ${d.getFullYear()}`;
+}
 function viewAkunLive() {
-  const q = (ui.q.akunLive || '').toLowerCase();
-  const rows = Kasir.akunList.filter((u) => { const nama = anggotaByNia(u.nia)?.nama || u.nama || ''; return !q || [u.username, nama, u.nia].some((v) => String(v || '').toLowerCase().includes(q)); });
-  const label = { admin: 'Kasir: admin', kasir: 'Kasir: kasir', anggota: 'Anggota', pengurus: 'Pengurus' };
-  const ketua = Kasir.ketua;
-  return `${pageHead('Akun & peran', `Atur peran Kopma Hub tiap akun.${ketua ? ' Sebagai ketua, kamu juga bisa menambah dan menghapus akun.' : ''} Role admin kasir tetap diatur lewat dashboard Supabase.`,
-    ketua ? `<button class="btn btn-primary" data-act="akun-live-baru">${ic('plus', 'icon-sm')}Tambah akun</button>` : '')}
+  const q = (ui.q.akunLive || '').toLowerCase(); const f = AK_FILTER[ui.akunFilter] ? ui.akunFilter : 'semua';
+  const namaDari = (u) => anggotaByNia(u.nia)?.nama || u.nama || u.username;
+  const cocok = Kasir.akunList.filter((u) => !q || [u.username, namaDari(u), u.nia].some((v) => String(v || '').toLowerCase().includes(q)));
+  const rows = cocok.filter(AK_FILTER[f][1]);
+  const ketua = Kasir.ketua; const akt = Kasir.aktivitasAkun;
+  const kasir = { admin: 'Admin', kasir: 'Kasir' };
+  const kosong = '<span class="ak-kosong">—</span>';
+  const peran = (u) => (u.hub || []).filter((r) => ROLES[r]).map((r) => ROLES[r].label).join(', ');
+  const baris = (u, i) => {
+    const saya = u.uid === Kasir.akun?.uid; const pr = peran(u); const a = akt?.[u.username];
+    const menu = saya ? '' : `<details class="ak-menu"><summary>Ubah</summary><div class="ak-pop">
+        <button type="button" data-act="peran-live" data-uid="${esc(u.uid)}">Atur jabatan</button>
+        ${ketua ? `<button type="button" class="ak-danger" data-act="akun-live-hapus" data-uid="${esc(u.uid)}">Hapus akun</button>` : ''}</div></details>`;
+    return `<tr>
+      <td class="ak-no">${String(i + 1).padStart(2, '0')}</td>
+      <td><div class="ak-nama">${esc(namaDari(u))}${saya ? '<span class="ak-kamu">— kamu</span>' : ''}</div><div class="ak-sub">${esc(u.username)}<span class="ak-hp">${[u.nia, pr, u.role === 'admin' ? 'admin kasir' : u.role === 'kasir' ? 'kasir' : ''].filter(Boolean).map((x) => ' · ' + esc(x)).join('')}</span></div></td>
+      <td class="ak-col ak-mono">${u.nia ? esc(u.nia) : kosong}</td>
+      <td class="ak-col">${pr ? esc(pr) : kosong}</td>
+      <td class="ak-col">${kasir[u.role] ? esc(kasir[u.role]) : kosong}</td>
+      ${akt ? `<td class="ak-col">${kasir[u.role] || a ? esc(terakhirJaga(a?.terakhir)) : kosong}</td><td class="ak-col ak-mono ak-r">${a ? a.n.toLocaleString('id-ID') : kosong}</td>` : ''}
+      <td class="ak-aksi">${menu}</td></tr>`;
+  };
+  return `<div class="ak">
+  <div class="ak-head"><div><h1>Daftar akun</h1><p>Siapa saja yang bisa masuk ke Kopma Hub dan web kasir.</p></div>
+    ${ketua ? `<button class="ak-btn" data-act="akun-live-baru">+ Tambah akun</button>` : ''}</div>
   ${Kasir.akunError ? `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir.akunError)}</span></div>` : ''}
-  <div class="toolbar"><div class="search">${ic('search')}<input class="input" data-live="akunLive" placeholder="Cari nama pengguna, nama, atau NIA…" value="${esc(ui.q.akunLive || '')}" aria-label="Cari akun"></div></div>
-  <div class="list" id="listAkunLive">${rows.map((u) => { const nama = anggotaByNia(u.nia)?.nama || u.nama || u.username; const saya = u.uid === Kasir.akun?.uid;
-    return `<div class="row">${avatar({ id: u.uid, nama })}<div class="grow"><div class="title">${esc(nama)} ${saya ? '<span class="pill c-sun">Kamu</span>' : ''}</div><div class="sub">${esc(u.username)}${u.nia ? ` · NIA <span class="num">${esc(u.nia)}</span>` : ' · belum terhubung NIA'}</div>
-      <div class="chips" style="margin-top:6px"><span class="pill c-${u.role === 'admin' || u.role === 'kasir' ? 'tangerine' : 'mint'} plain">${esc(label[u.role] || u.role || '-')}</span>${(u.hub || []).filter((r) => ROLES[r]).map((r) => `<span class="pill c-${ROLES[r].color}">${ROLES[r].label}</span>`).join('')}</div></div>
-      ${saya ? '' : `<div class="end"><button class="btn btn-soft btn-sm" data-act="peran-live" data-uid="${esc(u.uid)}">${ic('key', 'icon-sm')}Atur peran</button>${ketua ? `<button class="btn btn-ghost btn-sm" data-act="akun-live-hapus" data-uid="${esc(u.uid)}" aria-label="Hapus akun ${esc(u.username)}" title="Hapus akun" style="color:var(--coral-ink)">${ic('trash', 'icon-sm')}Hapus</button>` : ''}</div>`}</div>`; }).join('') || empty('users', 'Belum ada akun.')}</div>`;
+  <div class="ak-alat"><input class="ak-cari" data-live="akunLive" placeholder="Cari nama atau NIA" value="${esc(ui.q.akunLive || '')}" aria-label="Cari akun">
+    <div class="ak-filter" role="tablist">${Object.entries(AK_FILTER).map(([k, [lbl, fn]]) => `<button type="button" role="tab" aria-selected="${k === f}" class="${k === f ? 'on' : ''}" data-act="akun-filter" data-k="${k}">${lbl} (${cocok.filter(fn).length})</button>`).join('')}</div></div>
+  ${rows.length ? `<table class="ak-tabel" id="listAkunLive"><thead><tr><th class="ak-no">No.</th><th>Nama</th><th class="ak-col">NIA</th><th class="ak-col">Jabatan</th><th class="ak-col">Kasir</th>${akt ? '<th class="ak-col">Terakhir jaga</th><th class="ak-col ak-r">Transaksi</th>' : ''}<th class="ak-aksi"><span class="sr-only">Aksi</span></th></tr></thead>
+    <tbody>${rows.map(baris).join('')}</tbody></table>` : `<p class="ak-nol">${q ? 'Tidak ada akun yang cocok.' : 'Belum ada akun di kelompok ini.'}</p>`}
+  <div class="ak-kaki"><span>Hapus akun tidak menghapus riwayat transaksi. Admin kasir diatur lewat dashboard Supabase.</span></div>
+  </div>`;
 }
 
 function viewAkun() {
@@ -1172,6 +1201,7 @@ const ACT = {
       <p class="small muted">Ketua & sekretaris: kelola anggota dan peran. Bendahara: lihat data anggota. Tanpa peran: anggota biasa.</p><div id="plMsg"></div></form>`, 'mint',
       `${(u.hub || []).length ? `<button class="btn btn-ghost" data-act="peran-live-kosong" style="margin-right:auto;color:var(--coral-ink)">${ic('x', 'icon-sm')}Hapus semua peran</button>` : ''}<button class="btn btn-ghost" data-act="close-modal">Batal</button><button class="btn btn-primary" form="peranLiveForm" type="submit" id="plBtn">Simpan peran</button>`);
   },
+  'akun-filter': (el) => { ui.akunFilter = el.dataset.k; render(); },
   'peran-live-kosong': () => {
     const f = $('#peranLiveForm'); if (!f) return;
     f.querySelectorAll('[name=peran]').forEach((i) => { i.checked = false; i.closest('.chip').classList.remove('on'); });
@@ -1194,7 +1224,8 @@ const ACT = {
     const u = Kasir.akunList.find((x) => x.uid === el.dataset.uid); if (!u) return;
     const nama = anggotaByNia(u.nia)?.nama || u.nama || u.username;
     openModal('Hapus akun?', `<form class="form" data-form="akunLiveHapus" id="akunLiveHapusForm" autocomplete="off"><input type="hidden" name="uid" value="${esc(u.uid)}">
-      <p class="muted"><b>${esc(nama)}</b> (${esc(u.username)}) tidak akan bisa masuk lagi ke Kopma Hub maupun web kasir, dan semua perannya ikut terhapus. Riwayat transaksi, gaji jaga, dan data anggotanya tetap tersimpan. Tindakan ini tidak bisa dibatalkan.</p>
+      <p class="muted"><b>${esc(nama)}</b> (${esc(u.username)}) tidak akan bisa masuk lagi ke Kopma Hub maupun web kasir, dan semua perannya dicabut. Tindakan ini tidak bisa dibatalkan.</p>
+      <div class="notice c-mint">${ic('check')}<span><b>Riwayatnya tidak ikut dihapus.</b> Semua transaksi yang pernah dia layani, gaji jaga, dan data anggotanya tetap tersimpan. Stok dan laporan tidak berubah.</span></div>
       <div class="field"><label for="ahKonf">Ketik <b>${esc(u.username)}</b> untuk memastikan</label><input class="input" id="ahKonf" name="konf" required autocapitalize="none" spellcheck="false"></div>
       <div id="ahMsg"></div></form>`, 'coral',
       `<button class="btn btn-ghost" data-act="close-modal">Batal</button><button class="btn btn-primary" form="akunLiveHapusForm" type="submit" id="ahBtn">Hapus akun</button>`);
@@ -1698,6 +1729,7 @@ const FORM = {
 
 /* ================= Event wiring ================= */
 document.addEventListener('click', (e) => {
+  document.querySelectorAll('details.ak-menu[open]').forEach((d) => { if (!d.contains(e.target) || e.target.closest('[data-act]')) d.open = false; });
   const back = e.target.id === 'modalBack' ? e.target : null;
   if (back) { closeModal(); return; }
   const el = e.target.closest('[data-act]');
