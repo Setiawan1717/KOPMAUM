@@ -44,6 +44,7 @@ const I = {
   key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/>',
   user: '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
   sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/>',
   send: '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>',
 };
 const ic = (n, cls = '') => `<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true">${I[n]}</svg>`;
@@ -963,13 +964,15 @@ function viewAkunLive() {
   const q = (ui.q.akunLive || '').toLowerCase();
   const rows = Kasir.akunList.filter((u) => { const nama = anggotaByNia(u.nia)?.nama || u.nama || ''; return !q || [u.username, nama, u.nia].some((v) => String(v || '').toLowerCase().includes(q)); });
   const label = { admin: 'Kasir: admin', kasir: 'Kasir: kasir', anggota: 'Anggota', pengurus: 'Pengurus' };
-  return `${pageHead('Akun & peran', 'Atur peran Kopma Hub tiap akun. Role kasir (admin/kasir) tetap diatur admin lewat dashboard Supabase.')}
+  const ketua = Kasir.ketua;
+  return `${pageHead('Akun & peran', `Atur peran Kopma Hub tiap akun.${ketua ? ' Sebagai ketua, kamu juga bisa menambah dan menghapus akun.' : ''} Role admin kasir tetap diatur lewat dashboard Supabase.`,
+    ketua ? `<button class="btn btn-primary" data-act="akun-live-baru">${ic('plus', 'icon-sm')}Tambah akun</button>` : '')}
   ${Kasir.akunError ? `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir.akunError)}</span></div>` : ''}
   <div class="toolbar"><div class="search">${ic('search')}<input class="input" data-live="akunLive" placeholder="Cari nama pengguna, nama, atau NIA…" value="${esc(ui.q.akunLive || '')}" aria-label="Cari akun"></div></div>
   <div class="list" id="listAkunLive">${rows.map((u) => { const nama = anggotaByNia(u.nia)?.nama || u.nama || u.username; const saya = u.uid === Kasir.akun?.uid;
     return `<div class="row">${avatar({ id: u.uid, nama })}<div class="grow"><div class="title">${esc(nama)} ${saya ? '<span class="pill c-sun">Kamu</span>' : ''}</div><div class="sub">${esc(u.username)}${u.nia ? ` · NIA <span class="num">${esc(u.nia)}</span>` : ' · belum terhubung NIA'}</div>
       <div class="chips" style="margin-top:6px"><span class="pill c-${u.role === 'admin' || u.role === 'kasir' ? 'tangerine' : 'mint'} plain">${esc(label[u.role] || u.role || '-')}</span>${(u.hub || []).filter((r) => ROLES[r]).map((r) => `<span class="pill c-${ROLES[r].color}">${ROLES[r].label}</span>`).join('')}</div></div>
-      ${saya ? '' : `<div class="end"><button class="btn btn-soft btn-sm" data-act="peran-live" data-uid="${esc(u.uid)}">${ic('key', 'icon-sm')}Atur peran</button></div>`}</div>`; }).join('') || empty('users', 'Belum ada akun.')}</div>`;
+      ${saya ? '' : `<div class="end"><button class="btn btn-soft btn-sm" data-act="peran-live" data-uid="${esc(u.uid)}">${ic('key', 'icon-sm')}Atur peran</button>${ketua ? `<button class="btn btn-ghost btn-sm" data-act="akun-live-hapus" data-uid="${esc(u.uid)}" aria-label="Hapus akun ${esc(u.username)}" title="Hapus akun" style="color:var(--coral-ink)">${ic('trash', 'icon-sm')}Hapus</button>` : ''}</div>`}</div>`; }).join('') || empty('users', 'Belum ada akun.')}</div>`;
 }
 
 function viewAkun() {
@@ -1167,7 +1170,35 @@ const ACT = {
       <p class="muted">${esc(nama)} (${esc(u.username)}). Boleh lebih dari satu peran.</p>
       <div class="chips">${PERAN_HUB.map((k) => `<label class="chip c-${ROLES[k].color} ${(u.hub || []).includes(k) ? 'on' : ''}"><input type="checkbox" name="peran" value="${k}" ${(u.hub || []).includes(k) ? 'checked' : ''} data-live="rolechip" style="position:absolute;opacity:0;width:0">${ROLES[k].label}</label>`).join('')}</div>
       <p class="small muted">Ketua & sekretaris: kelola anggota dan peran. Bendahara: lihat data anggota. Tanpa peran: anggota biasa.</p><div id="plMsg"></div></form>`, 'mint',
-      `<button class="btn btn-ghost" data-act="close-modal">Batal</button><button class="btn btn-primary" form="peranLiveForm" type="submit" id="plBtn">Simpan peran</button>`);
+      `${(u.hub || []).length ? `<button class="btn btn-ghost" data-act="peran-live-kosong" style="margin-right:auto;color:var(--coral-ink)">${ic('x', 'icon-sm')}Hapus semua peran</button>` : ''}<button class="btn btn-ghost" data-act="close-modal">Batal</button><button class="btn btn-primary" form="peranLiveForm" type="submit" id="plBtn">Simpan peran</button>`);
+  },
+  'peran-live-kosong': () => {
+    const f = $('#peranLiveForm'); if (!f) return;
+    f.querySelectorAll('[name=peran]').forEach((i) => { i.checked = false; i.closest('.chip').classList.remove('on'); });
+    f.requestSubmit();
+  },
+  'akun-live-baru': () => {
+    if (!Kasir.ketua) return;
+    openModal('Tambah akun', `<form class="form" data-form="akunLiveBaru" id="akunLiveBaruForm" autocomplete="off">
+      <div class="field"><label for="abUser">Nama pengguna</label><input class="input" id="abUser" name="user" required autocapitalize="none" spellcheck="false" placeholder="mis. budi.s" pattern="[A-Za-z0-9._\-]{3,30}"><span class="hint">Dipakai untuk masuk ke Kopma Hub dan web kasir. 3-30 karakter tanpa spasi.</span></div>
+      <div class="field"><label for="abPass">Kata sandi awal</label><input class="input" id="abPass" name="pass" type="text" required minlength="6" autocomplete="new-password"><span class="hint">Minimal 6 karakter. Berikan ke pemilik akun.</span></div>
+      <div class="field"><label for="abNia">NIA (opsional)</label><input class="input num" id="abNia" name="nia" autocapitalize="characters" placeholder="Kosongkan kalau bukan anggota"><span class="hint">Harus sudah ada di data anggota dan belum dipakai akun lain.</span></div>
+      <div class="field"><label for="abRole">Akses web kasir</label><select class="input" id="abRole" name="role"><option value="anggota">Tidak ada (anggota)</option><option value="kasir">Kasir</option></select><span class="hint">Role admin kasir hanya lewat dashboard Supabase.</span></div>
+      <div class="field"><label>Peran Kopma Hub</label><div class="chips">${PERAN_HUB.map((k) => `<label class="chip c-${ROLES[k].color}"><input type="checkbox" name="peran" value="${k}" data-live="rolechip" style="position:absolute;opacity:0;width:0">${ROLES[k].label}</label>`).join('')}</div><span class="hint">Boleh lebih dari satu, atau kosong untuk anggota biasa.</span></div>
+      <div id="abMsg"></div></form>`, 'mint',
+      `<button class="btn btn-ghost" data-act="close-modal">Batal</button><button class="btn btn-primary" form="akunLiveBaruForm" type="submit" id="abBtn">Buat akun</button>`);
+    $('#abUser')?.focus();
+  },
+  'akun-live-hapus': (el) => {
+    if (!Kasir.ketua) return;
+    const u = Kasir.akunList.find((x) => x.uid === el.dataset.uid); if (!u) return;
+    const nama = anggotaByNia(u.nia)?.nama || u.nama || u.username;
+    openModal('Hapus akun?', `<form class="form" data-form="akunLiveHapus" id="akunLiveHapusForm" autocomplete="off"><input type="hidden" name="uid" value="${esc(u.uid)}">
+      <p class="muted"><b>${esc(nama)}</b> (${esc(u.username)}) tidak akan bisa masuk lagi ke Kopma Hub maupun web kasir, dan semua perannya ikut terhapus. Riwayat transaksi, gaji jaga, dan data anggotanya tetap tersimpan. Tindakan ini tidak bisa dibatalkan.</p>
+      <div class="field"><label for="ahKonf">Ketik <b>${esc(u.username)}</b> untuk memastikan</label><input class="input" id="ahKonf" name="konf" required autocapitalize="none" spellcheck="false"></div>
+      <div id="ahMsg"></div></form>`, 'coral',
+      `<button class="btn btn-ghost" data-act="close-modal">Batal</button><button class="btn btn-primary" form="akunLiveHapusForm" type="submit" id="ahBtn">Hapus akun</button>`);
+    $('#ahKonf')?.focus();
   },
   'anggota-live-filter': (el) => { ui.anggotaLiveFilter = el.dataset.k; render(); },
   'anggota-live-form': (el) => formAnggotaLive(el.dataset.nia ? Kasir.anggota.find((a) => a.nia === el.dataset.nia) : null),
@@ -1462,6 +1493,25 @@ const FORM = {
     const aksi = `Ubah peran ${u?.username || 'akun'}: ${lbl(u?.hub)} → ${lbl(hub)}`;
     try { await Kasir.ubahPeran(f.uid.value, hub, aksi); closeModal(); toast('Peran diperbarui', 'mint'); render(); }
     catch (e) { btn.disabled = false; btn.textContent = 'Simpan peran'; $('#plMsg').innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir._pesan(e))}</span></div>`; }
+  },
+  akunLiveBaru: async (f) => {
+    const msg = $('#abMsg'); const err = (t) => { msg.innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(t)}</span></div>`; };
+    const user = f.user.value.trim(); const nia = f.nia.value.trim() ? normNia(f.nia.value) : '';
+    if (!/^[A-Za-z0-9._\-]{3,30}$/.test(user)) return err('Nama pengguna 3-30 karakter: huruf, angka, titik, strip, atau garis bawah, tanpa spasi.');
+    if (f.pass.value.length < 6) return err('Kata sandi minimal 6 karakter.');
+    if (nia && !/^[A-Z0-9.\-\/]{3,20}$/.test(nia)) return err('Format NIA tidak sesuai.');
+    const hub = [...f.querySelectorAll('[name=peran]:checked')].map((i) => i.value);
+    const btn = $('#abBtn'); btn.disabled = true; btn.textContent = 'Membuat…';
+    try { await Kasir.buatAkun({ username: user, pass: f.pass.value, nia, role: f.role.value, hub }); closeModal(); toast(`Akun ${esc(user.toLowerCase())} dibuat`, 'mint'); render(); }
+    catch (e) { btn.disabled = false; btn.textContent = 'Buat akun'; err(Kasir._pesan(e)); }
+  },
+  akunLiveHapus: async (f) => {
+    const u = Kasir.akunList.find((a) => a.uid === f.uid.value); if (!u) return closeModal();
+    const msg = $('#ahMsg');
+    if (f.konf.value.trim().toLowerCase() !== u.username) { msg.innerHTML = `<div class="notice c-coral">${ic('alert')}<span>Nama pengguna yang diketik tidak sama.</span></div>`; return; }
+    const btn = $('#ahBtn'); btn.disabled = true; btn.textContent = 'Menghapus…';
+    try { await Kasir.hapusAkun(u.uid); closeModal(); toast(`Akun ${esc(u.username)} dihapus`, 'coral'); render(); }
+    catch (e) { btn.disabled = false; btn.textContent = 'Hapus akun'; msg.innerHTML = `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir._pesan(e))}</span></div>`; }
   },
   anggotaLive: async (f) => {
     const baru = f.baru.value === '1';
