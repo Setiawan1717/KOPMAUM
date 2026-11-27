@@ -14,8 +14,9 @@ Project: **kopma-um** (region Singapura, paket gratis). **Dipakai Kopma Hub dan 
 | `…04_rental.sql` | inventaris & booking sewa, kalender publik |
 | `…05_pengamanan.sql` | perbaikan dari pemeriksaan keamanan & performa Supabase |
 | `…06_indeks_kasir.sql` | indeks untuk pembaruan bertahap di web kasir |
+| `…08_kelola_akun_ketua.sql` | ketua menambah & menghapus akun dari Kopma Hub (`ketua_daftarkan_akun`, `ketua_hapus_akun`); riwayat transaksi & penarikan gaji tetap ada saat akun dihapus |
 
-Semua migrasi sudah terpasang di project kopma-um.
+Semua migrasi (termasuk 8, dipasang 27 November 2026) sudah terpasang di project kopma-um.
 
 ## Prinsip keamanan
 

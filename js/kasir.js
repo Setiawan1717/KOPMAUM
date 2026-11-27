@@ -30,6 +30,7 @@ const Kasir = {
   get aksesKasir() { return ['admin', 'kasir'].includes(this.akun?.role); },
   get _admin() { return this.akun?.role === 'admin'; },
   get kelolaAkun() { return this._admin || this._punya('ketua', 'sekretaris'); },
+  get ketua() { return this._punya('ketua'); },            // tambah & hapus akun (dijaga juga di server)
   get bacaJejak() { return this._admin || this._punya('ketua', 'sekretaris', 'bendahara'); },
   get prosesGaji() { return this._admin || this._punya('ketua', 'bendahara'); },
   get aturJadwal() { return this._admin || this._punya('ketua', 'bidang_usaha'); },
@@ -381,6 +382,34 @@ const Kasir = {
     this._ok(await this._sb.from('akun').update({ hub }).eq('id', uid).select('id').single());
     await Promise.all([this._muatAkunList(), this.bacaJejak ? this._muatJejak() : null]);
   },
+  // ketua menambah akun: login dibuat lewat klien terpisah (sesi ketua tidak berganti), lalu didaftarkan server
+  async buatAkun({ username, pass, nia, role, hub }) {
+    const user = username.replace(/\s+/g, '').toLowerCase(); const email = user + '@kopma.um';
+    if (this.akunList.some((a) => a.username === user)) throw this._galat('Nama pengguna itu sudah dipakai. Pilih nama lain.');
+    await this._load();
+    const { createClient } = await import(SUPABASE_JS);
+    const sb2 = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'kopmahub-buat-akun' } });
+    try {
+      let r = await sb2.auth.signUp({ email, password: pass });
+      const sudahAda = r.error && /already registered|already been registered/i.test(r.error.message);
+      if (r.error && !sudahAda) throw r.error;
+      // login sudah ada tanpa baris akun (percobaan sebelumnya terhenti): pakai lagi kalau kata sandinya sama
+      if (sudahAda || !r.data.user?.id || (r.data.user.identities && !r.data.user.identities.length)) {
+        r = await sb2.auth.signInWithPassword({ email, password: pass });
+        if (r.error && /Email not confirmed/i.test(r.error.message)) throw this._galat('Login dibuat tetapi belum aktif: matikan "Confirm email" di Supabase.');
+        if (r.error) throw this._galat('Nama pengguna itu sudah dipakai. Pilih nama lain.');
+      }
+      this._ok(await this._sb.rpc('ketua_daftarkan_akun', { p_uid: r.data.user.id, p_username: user, p_nia: nia || null, p_role: role, p_hub: hub }));
+    } finally {
+      try { await sb2.auth.signOut(); } catch (x) { /* abaikan */ }
+    }
+    await Promise.all([this._muatAkunList(), this.bacaJejak ? this._muatJejak() : null]);
+  },
+  // ketua menghapus akun (login ikut terhapus; riwayat transaksi & gaji tetap ada)
+  async hapusAkun(uid) {
+    this._ok(await this._sb.rpc('ketua_hapus_akun', { p_uid: uid }));
+    await Promise.all([this._muatAkunList(), this.bacaJejak ? this._muatJejak() : null]);
+  },
   // tambah / ubah data anggota. Mengembalikan false kalau tidak ada yang berubah.
   async simpanAnggota(data, baru) {
     const kosong = (x) => (x === '' || x === undefined ? null : x);
@@ -448,7 +477,9 @@ const Kasir = {
     const tgl = (t) => { try { const d = parseYmd(String(t).slice(0, 10)); return `${d.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'][d.getMonth()]}`; } catch (e) { return t; } };
     switch (r.tabel) {
       case 'anggota': return r.aksi === 'tambah' ? `Anggota baru ${judul} (${r.kunci})` : `Ubah data ${judul} (${r.kunci}): ${this._beda(p)}`;
-      case 'akun': return Object.keys(p).length === 1 && p.hub ? `Ubah peran ${judul}: ${this._nilai('hub', p.hub[0])} → ${this._nilai('hub', p.hub[1])}` : `Ubah akun ${judul}: ${this._beda(p)}`;
+      case 'akun': if (r.aksi === 'tambah') return `Akun baru ${r.kunci} dibuat ketua (${this._nilai('hub', baru('hub'))})`;
+        if (r.aksi === 'hapus') return `Hapus akun ${r.kunci}${judul !== r.kunci ? ' (' + judul + ')' : ''}`;
+        return Object.keys(p).length === 1 && p.hub ? `Ubah peran ${judul}: ${this._nilai('hub', p.hub[0])} → ${this._nilai('hub', p.hub[1])}` : `Ubah akun ${judul}: ${this._beda(p)}`;
       case 'pengaturan': {
         const [a, b] = p.nilai || [];
         if (r.kunci === 'rp_per_poin') return `Rumus poin ${this._rp(a)} → ${this._rp(b)} per poin`;
