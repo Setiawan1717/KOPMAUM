@@ -200,8 +200,8 @@ function render() {
   app().innerHTML = `
   <div class="shell">
     <aside class="sidebar" aria-label="Navigasi utama">
-      <div class="brand"><img src="logo-kopma.png" alt=""><div>Kopma Hub<small>Web internal Kopma UM</small></div></div>
-      ${nav.map((n) => `<a href="#${n.id}" class="nav-item c-${n.color} ${n.id === ui.view ? 'active' : ''}" ${n.id === ui.view ? 'aria-current="page"' : ''}><span class="sq">${ic(n.icon)}</span>${esc(navLabel(n))}</a>`).join('')}
+      <div class="brand"><img src="logo-kopma.png" alt=""><div>Kopma Hub<small>Koperasi Mahasiswa UM</small></div></div>
+      ${[['Usaha', ['dasbor', 'stok', 'rental', 'fee']], ['Organisasi', ['anggota', 'poin', 'akun', 'jejak']]].map(([grp, ids]) => { const isi = nav.filter((n) => ids.includes(n.id)); return isi.length ? `<div class="nav-grp"><div class="eyebrow">${grp}</div>${isi.map((n) => `<a href="#${n.id}" class="nav-item ${n.id === ui.view ? 'active' : ''}" ${n.id === ui.view ? 'aria-current="page"' : ''}>${esc(navLabel(n))}</a>`).join('')}</div>` : ''; }).join('')}
       <div class="grow"></div>
       <button class="me-card" data-act="menu-akun">${avatar(p)}<span><b>${esc(p.nama)}</b><span class="small muted">${esc(roles.filter((r) => r !== 'anggota').map((r) => ROLES[r].short).join(' · ') || 'Anggota')}</span></span></button>
     </aside>
@@ -333,7 +333,7 @@ function viewDasbor() {
     <div class="hero-content">
       <span class="eyebrow" style="color:var(--sun)">${tglPanjang(TODAY)}</span>
       <h1>${salam}, ${esc(p.nama.split(' ')[0])}!</h1>
-      <div class="chips">${roles.map((r) => `<span class="pill c-${ROLES[r].color}" style="background:rgba(255,255,255,.14);color:#fff">${esc(ROLES[r].label)}</span>`).join('')}</div>
+      <div class="chips">${roles.map((r) => `<span class="pill c-${ROLES[r].color}">${esc(ROLES[r].label)}</span>`).join('')}</div>
       ${quick.length ? `<div class="actions" style="margin-top:6px">${quick.join('')}</div>` : ''}
     </div>
   </section>
@@ -721,7 +721,7 @@ function riwayatPoinKasir(d, max = 50) {
 }
 function kartuPoinNia(nia, d) {
   const p = anggotaByNia(nia);
-  return `<section class="card c-grape" style="background:linear-gradient(135deg,var(--grape-soft),var(--pink-soft))">
+  return `<section class="card c-grape" >
     <span class="eyebrow">${p ? esc(p.nama) + ' · ' : ''}NIA <span class="num">${esc(nia)}</span></span>
     <div class="bignum num" style="color:var(--grape-ink)">${fmtNum(d?.poin || 0)}</div>
     <p class="muted small" style="margin-top:8px">${d ? `Dari ${d.n} kali belanja senilai ${rp(d.belanja)}. Terakhir ${waktu(d.terakhir)}.` : 'Belum ada belanja dengan NIA ini di kasir.'}</p>
@@ -779,7 +779,7 @@ function viewPoin() {
     const mine = db.poin.filter((x) => x.userId === meId).sort((a, b) => b.waktu.localeCompare(a.waktu));
     const totalBelanja = mine.reduce((a, x) => a + x.belanja, 0);
     body = `<div class="grid grid-2">
-      <section class="card c-grape" style="background:linear-gradient(135deg,var(--grape-soft),var(--pink-soft))">
+      <section class="card c-grape" >
         <span class="eyebrow">Saldo poin</span>
         <div class="bignum num" style="color:var(--grape-ink)">${fmtNum(saldoPoin(meId))}</div>
         <p class="muted small" style="margin-top:8px">Dari ${mine.filter((x) => x.belanja).length} kali belanja senilai ${rp(totalBelanja)}. Setiap ${rp(rate)} belanja = 1 poin.</p>

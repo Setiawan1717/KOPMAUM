@@ -1,56 +1,61 @@
-/* Kopma Hub — layout: sidebar warna-warni di desktop, bottom nav di HP; tiap modul punya warnanya sendiri. */
+/* Kopma Hub — gaya "buku kas koperasi": kertas krem, tinta cokelat tua, judul serif, garis buku besar.
+   Warna modul dibuat redup dan hanya dipakai untuk arti (status, peringatan), bukan hiasan. */
 :root {
-  --font-display: 'Bricolage Grotesque', 'Inter Tight', system-ui, sans-serif;
-  --font-body: 'Inter Tight', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-body: 'IBM Plex Sans', 'Inter Tight', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-  --navy: #1C2461;
-  --bg: #F4F5FE;
-  --surface: #FFFFFF;
-  --surface-2: #EEF0FB;
-  --line: #DFE3F5;
-  --text: #1C2461;
-  --muted: #5A6191;
-  --shadow: 0 1px 2px rgba(28, 36, 97, .06), 0 6px 20px rgba(28, 36, 97, .07);
+  --navy: #2A2823;            /* dipakai elemen lama sebagai "tinta gelap" */
+  --hijau: #1F6B3A;           /* satu-satunya warna aksen */
+  --bg: #F6F2E9;
+  --surface: #FBF8F1;
+  --surface-2: #EFE9DC;
+  --line: #DDD5C4;
+  --text: #2A2823;
+  --muted: #7A7466;
+  --shadow: none;
 
-  /* Palet ceria — 8 warna, satu per modul */
-  --lime: #8CCB1F;      --lime-soft: #EDF8D3;      --lime-ink: #3D5807;
-  --sun: #FFBF1F;       --sun-soft: #FFF3CC;       --sun-ink: #6E4A00;
-  --coral: #FF5468;     --coral-soft: #FFE1E5;     --coral-ink: #A11427;
-  --sky: #2AA5EE;       --sky-soft: #DAF0FD;       --sky-ink: #0A5687;
-  --grape: #8A58F2;     --grape-soft: #ECE3FF;     --grape-ink: #4A2296;
-  --tangerine: #FF8524; --tangerine-soft: #FFE8D4; --tangerine-ink: #8A3F00;
-  --pink: #F056AC;      --pink-soft: #FDE0F0;      --pink-ink: #8C1A5A;
-  --mint: #19C295;      --mint-soft: #D3F6EB;      --mint-ink: #08664C;
+  /* palet modul diredupkan (tetap dibedakan untuk status di kalender, pil, dan pemberitahuan) */
+  --lime: #5E8A2E;      --lime-soft: #E7EBD5;      --lime-ink: #3F5A1C;
+  --sun: #B8862B;       --sun-soft: #F2E6C8;       --sun-ink: #6B4C10;
+  --coral: #B0442F;     --coral-soft: #F3DDD5;     --coral-ink: #8A2E1D;
+  --sky: #3D6480;       --sky-soft: #DFE6EA;       --sky-ink: #2B4A60;
+  --grape: #6E4D7A;     --grape-soft: #E8DFE8;     --grape-ink: #4E3358;
+  --tangerine: #A85A26; --tangerine-soft: #F1E0D0; --tangerine-ink: #7A3F17;
+  --pink: #9A4A5E;      --pink-soft: #F0DDE1;      --pink-ink: #713244;
+  --mint: #1F6B3A;      --mint-soft: #DCE8DA;      --mint-ink: #1F5A33;
 
-  --radius: 16px;
-  --radius-sm: 10px;
+  --radius: 4px;
+  --radius-sm: 3px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0F1230; --surface: #181C40; --surface-2: #212653; --line: #2E3468;
-    --text: #EEF0FF; --muted: #A6ACD8; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
-    --lime-soft: #26350C;      --lime-ink: #C9F06B;
-    --sun-soft: #3A2E08;       --sun-ink: #FFD866;
-    --coral-soft: #44141E;     --coral-ink: #FF9AA6;
-    --sky-soft: #0C2E47;       --sky-ink: #8DD3FA;
-    --grape-soft: #2B1C55;     --grape-ink: #C7AEFF;
-    --tangerine-soft: #3F2209; --tangerine-ink: #FFB677;
-    --pink-soft: #431634;      --pink-ink: #FF9FD3;
-    --mint-soft: #0A3A2E;      --mint-ink: #7BEBC8;
+    --navy: #ECE5D6; --hijau: #6CBF8A;
+    --bg: #1C1B17; --surface: #23211C; --surface-2: #2C2A24; --line: #3A372F;
+    --text: #ECE5D6; --muted: #9D9584;
+    --lime: #9CC46A; --lime-soft: #2A3020;           --lime-ink: #B9D88E;
+    --sun: #D9AE58;  --sun-soft: #3A3020;            --sun-ink: #E8C67F;
+    --coral: #E07F69; --coral-soft: #3D2520;         --coral-ink: #F0A08E;
+    --sky: #8BB0C9;  --sky-soft: #24303A;            --sky-ink: #A9C6DA;
+    --grape: #B596C0; --grape-soft: #322735;         --grape-ink: #CDB4D5;
+    --tangerine: #D9925E; --tangerine-soft: #3A2A1E; --tangerine-ink: #E8AE82;
+    --pink: #D08A9C; --pink-soft: #3A252B;           --pink-ink: #E2A8B6;
+    --mint: #6CBF8A; --mint-soft: #22332A;           --mint-ink: #94D3AA;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0F1230; --surface: #181C40; --surface-2: #212653; --line: #2E3468;
-  --text: #EEF0FF; --muted: #A6ACD8; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
-  --lime-soft: #26350C;      --lime-ink: #C9F06B;
-  --sun-soft: #3A2E08;       --sun-ink: #FFD866;
-  --coral-soft: #44141E;     --coral-ink: #FF9AA6;
-  --sky-soft: #0C2E47;       --sky-ink: #8DD3FA;
-  --grape-soft: #2B1C55;     --grape-ink: #C7AEFF;
-  --tangerine-soft: #3F2209; --tangerine-ink: #FFB677;
-  --pink-soft: #431634;      --pink-ink: #FF9FD3;
-  --mint-soft: #0A3A2E;      --mint-ink: #7BEBC8;
+  --navy: #ECE5D6; --hijau: #6CBF8A;
+  --bg: #1C1B17; --surface: #23211C; --surface-2: #2C2A24; --line: #3A372F;
+  --text: #ECE5D6; --muted: #9D9584;
+  --lime: #9CC46A; --lime-soft: #2A3020;           --lime-ink: #B9D88E;
+  --sun: #D9AE58;  --sun-soft: #3A3020;            --sun-ink: #E8C67F;
+  --coral: #E07F69; --coral-soft: #3D2520;         --coral-ink: #F0A08E;
+  --sky: #8BB0C9;  --sky-soft: #24303A;            --sky-ink: #A9C6DA;
+  --grape: #B596C0; --grape-soft: #322735;         --grape-ink: #CDB4D5;
+  --tangerine: #D9925E; --tangerine-soft: #3A2A1E; --tangerine-ink: #E8AE82;
+  --pink: #D08A9C; --pink-soft: #3A252B;           --pink-ink: #E2A8B6;
+  --mint: #6CBF8A; --mint-soft: #22332A;           --mint-ink: #94D3AA;
   color-scheme: dark;
 }
 
@@ -369,10 +374,7 @@ textarea.csv { width: 100%; min-height: 220px; font-family: ui-monospace, 'SF Mo
 
 /* ---------- Halaman Akun: gaya "buku kas" (kertas, huruf serif, garis buku besar) ---------- */
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-:root { --ak-kertas: #F6F2E9; --ak-tinta: #2A2823; --ak-pudar: #7A7466; --ak-garis: #D9D1C0; --ak-hijau: #1F6B3A; --ak-pop: #FFFDF8; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ak-kertas: #1C1B17; --ak-tinta: #ECE5D6; --ak-pudar: #9D9584; --ak-garis: #3A372F; --ak-hijau: #6CBF8A; --ak-pop: #26241F; } }
-:root[data-theme="dark"] { --ak-kertas: #1C1B17; --ak-tinta: #ECE5D6; --ak-pudar: #9D9584; --ak-garis: #3A372F; --ak-hijau: #6CBF8A; --ak-pop: #26241F; }
-body:has(.main.v-akun) { background: var(--ak-kertas); }
+:root { --ak-kertas: var(--bg); --ak-tinta: var(--text); --ak-pudar: var(--muted); --ak-garis: var(--line); --ak-hijau: var(--hijau); --ak-pop: var(--surface); }
 .ak { color: var(--ak-tinta); font-family: 'IBM Plex Sans', var(--font-body); font-size: .9rem; display: grid; gap: 18px; max-width: 1060px; }
 .ak h1 { font-family: 'Newsreader', Georgia, serif; font-weight: 600; font-size: clamp(2rem, 1.6rem + 1.4vw, 2.6rem); line-height: 1; letter-spacing: -0.01em; margin: 0 0 8px; }
 .ak-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding-bottom: 14px; border-bottom: 2px solid var(--ak-tinta); }
@@ -420,3 +422,128 @@ body:has(.main.v-akun) { background: var(--ak-kertas); }
   .ak-cari { width: 100%; }
   .ak-head { flex-wrap: wrap; }
 }
+
+/* ================= Lapisan gaya buku kas (menimpa komponen lama) ================= */
+body { font-size: 14.5px; }
+h1, h2, h3, h4 { font-weight: 600; letter-spacing: -0.005em; }
+h1 { font-size: clamp(1.9rem, 1.5rem + 1.4vw, 2.5rem); font-weight: 600; line-height: 1.05; }
+h2 { font-size: 1.3rem; } h3 { font-size: 1.08rem; }
+.eyebrow { font-family: var(--font-body); font-weight: 500; letter-spacing: .12em; }
+:focus-visible { outline: 2px solid var(--hijau); outline-offset: 2px; border-radius: 2px; }
+.chip:has(input:focus-visible) { outline: 2px solid var(--hijau); }
+.num, .mono { font-variant-numeric: tabular-nums; }
+
+/* sidebar: teks saja, dikelompokkan, penanda aktif garis hijau */
+@media (min-width: 900px) {
+  .shell { grid-template-columns: 232px 1fr; }
+  .sidebar { background: var(--bg); padding: 28px 22px 22px; gap: 26px; }
+  .sidebar .brand { padding: 0; }
+  .main { padding-block: 40px 56px; padding-left: 56px; padding-right: max(56px, env(safe-area-inset-right, 0px)); }
+}
+.brand { font-weight: 600; font-size: 1.15rem; }
+.brand img { width: 36px; height: 36px; border-radius: 0; background: none; padding: 0; }
+.brand small { font-size: .74rem; font-weight: 400; }
+.nav-grp { display: grid; gap: 2px; }
+.nav-grp .eyebrow { font-size: .68rem; margin-bottom: 4px; }
+.nav-item { padding: 5px 0 5px 12px; border-radius: 0; border-left: 2px solid transparent; font-weight: 400; color: var(--text); gap: 0; }
+.nav-item .sq { display: none; }
+.nav-item:hover { background: none; color: var(--hijau); }
+.nav-item.active { background: none; color: var(--hijau); border-left-color: var(--hijau); font-weight: 600; }
+.me-card { background: none; border-radius: 0; border-top: 1px solid var(--line); padding: 14px 0 0; }
+.me-card .avatar { display: none; }
+.me-card b { font-weight: 600; font-size: .88rem; }
+.topbar { background: color-mix(in srgb, var(--bg) 92%, transparent); }
+.topbar .avatar { border-radius: 50%; background: var(--surface-2); color: var(--text); }
+.bottomnav { background: var(--bg); }
+.bn-item { font-weight: 500; color: var(--muted); }
+.bn-item.active { color: var(--hijau); }
+.bn-item.active .dot { background: none; color: var(--hijau); }
+
+/* judul halaman: tanpa badge, garis tebal di bawah seperti kepala buku */
+.page-head { padding-bottom: 14px; border-bottom: 2px solid var(--text); align-items: flex-end; }
+.page-head .badge-mod { display: none; }
+.page-head > div:first-child { gap: 8px; }
+.page-head p.muted { max-width: 64ch; }
+
+/* tombol: datar, sudut kecil, satu warna aksen */
+.btn { min-height: 38px; padding: 0 14px; border-radius: 3px; font-weight: 500; transition: background .15s, filter .15s; }
+.btn:active { transform: none; }
+.btn-primary { background: var(--hijau); color: #fff; box-shadow: none; }
+.btn-primary:hover { filter: brightness(1.1); }
+.c-coral .btn-primary, .btn-primary.c-coral, .modal.c-coral .btn-primary { background: var(--coral); }
+.btn-soft { background: transparent; border-color: var(--line); color: var(--text); }
+.btn-soft:hover { background: var(--surface-2); }
+.btn-ghost { background: transparent; }
+.btn-sm { min-height: 32px; padding: 0 10px; border-radius: 3px; font-size: .84rem; }
+.btn-dark { background: var(--text); color: var(--bg); }
+:root[data-theme="dark"] .btn-primary { color: #12170F; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn-primary { color: #12170F; } }
+
+/* kartu & ubin: tanpa bayangan, tanpa lingkaran hiasan */
+.card { border-radius: 4px; box-shadow: none; padding: 20px; }
+.card-head h2, .card-head h3 { font-family: var(--font-display); }
+.tile { background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 16px 18px; }
+.tile::after { display: none; }
+.tile .t-icon { display: none; }
+.tile .t-val { font-weight: 600; font-size: 1.9rem; }
+.tile .t-lbl { font-weight: 400; color: var(--muted); }
+a.tile:hover, button.tile:hover { transform: none; border-color: var(--text); }
+.hero { background: none; color: var(--text); border-radius: 0; padding: 0 0 18px; border-bottom: 2px solid var(--text); }
+.hero .blob { display: none; }
+.hero h1 { color: var(--text); }
+.hero p { color: var(--muted); }
+
+/* pil, chip, daftar */
+.pill { border-radius: 2px; font-weight: 500; padding: 1px 7px; background: transparent; border: 1px solid color-mix(in srgb, var(--c-ink) 35%, transparent); }
+.pill::before { display: none; }
+.chip { border-radius: 3px; font-weight: 500; }
+.chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.chip .count { background: transparent; }
+.list { gap: 0; border-top: 1px solid var(--line); }
+.row { border-radius: 0; border: 0; border-bottom: 1px dotted var(--line); background: transparent; padding: 12px 2px; }
+.row.click:hover { background: color-mix(in srgb, var(--text) 4%, transparent); border-color: var(--line); }
+.row .title { font-weight: 600; }
+.row.alert { background: transparent; border-left: 3px solid var(--coral); padding-left: 10px; }
+.stripe { width: 3px; border-radius: 0; }
+.empty .ill { border-radius: 50%; background: var(--surface-2); color: var(--muted); }
+
+/* tabel: kepala bergaris tinta, baris bertitik */
+.table-wrap { border-radius: 0; border: 0; border-top: 1px solid var(--text); }
+th { font-size: .78rem; letter-spacing: 0; text-transform: none; font-weight: 500; background: none; border-bottom: 1px solid var(--text); }
+td { border-top: 0; border-bottom: 1px dotted var(--line); }
+
+/* isian */
+.field label { font-weight: 500; }
+.input, select.input, textarea.input { border-radius: 3px; border-width: 1px; min-height: 40px; background: var(--surface); }
+.input:focus { border-color: var(--text); box-shadow: none; }
+.input-lg { font-weight: 500; min-height: 50px; }
+.seg { border-radius: 3px; padding: 3px; }
+.seg button { border-radius: 2px; font-weight: 500; }
+.seg button.on { box-shadow: none; color: var(--text); }
+.notice { border-radius: 3px; font-weight: 400; border-left: 3px solid var(--c, var(--line)); }
+.preview { border-radius: 3px; }
+.preview .total, .bignum { font-weight: 600; }
+.meter, .meter > i { border-radius: 0; }
+
+/* kalender: kotak datar */
+.day { border-radius: 2px; font-weight: 500; }
+.day:hover { transform: none; outline: 1px solid var(--text); }
+.legend i { border-radius: 2px; }
+
+/* modal & toast */
+.modal-back { background: rgba(30, 26, 18, .4); backdrop-filter: none; }
+.modal { border-radius: 6px 6px 0 0; border-top: 0; animation: rise .18s ease; }
+@media (min-width: 640px) { .modal { border-radius: 6px; } }
+.modal-head h2, .modal-head h3 { font-family: var(--font-display); }
+.toast { background: var(--text); color: var(--bg); border-radius: 3px; border-left: 3px solid var(--hijau); font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+.avatar { border-radius: 50%; background: var(--surface-2); color: var(--text); font-weight: 600; }
+.demo-acc { border-radius: 3px; border-width: 1px; }
+.demo-acc:hover { transform: none; border-color: var(--text); }
+
+/* login: kertas, bukan panel navy dengan bentuk warna-warni */
+.login-art { background: var(--surface-2); color: var(--text); }
+.login-art h1 { color: var(--text); }
+.login-art p { color: var(--muted); }
+.login-art .shapes { display: none; }
+.login-art .logos img { border-radius: 0; background: none; }
+.mods .pill { background: transparent; color: var(--text); }
