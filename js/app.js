@@ -1194,7 +1194,8 @@ const ACT = {
     const u = Kasir.akunList.find((x) => x.uid === el.dataset.uid); if (!u) return;
     const nama = anggotaByNia(u.nia)?.nama || u.nama || u.username;
     openModal('Hapus akun?', `<form class="form" data-form="akunLiveHapus" id="akunLiveHapusForm" autocomplete="off"><input type="hidden" name="uid" value="${esc(u.uid)}">
-      <p class="muted"><b>${esc(nama)}</b> (${esc(u.username)}) tidak akan bisa masuk lagi ke Kopma Hub maupun web kasir, dan semua perannya ikut terhapus. Riwayat transaksi, gaji jaga, dan data anggotanya tetap tersimpan. Tindakan ini tidak bisa dibatalkan.</p>
+      <p class="muted"><b>${esc(nama)}</b> (${esc(u.username)}) tidak akan bisa masuk lagi ke Kopma Hub maupun web kasir, dan semua perannya dicabut. Tindakan ini tidak bisa dibatalkan.</p>
+      <div class="notice c-mint">${ic('check')}<span><b>Riwayatnya tidak ikut dihapus.</b> Semua transaksi yang pernah dia layani, gaji jaga, dan data anggotanya tetap tersimpan. Stok dan laporan tidak berubah.</span></div>
       <div class="field"><label for="ahKonf">Ketik <b>${esc(u.username)}</b> untuk memastikan</label><input class="input" id="ahKonf" name="konf" required autocapitalize="none" spellcheck="false"></div>
       <div id="ahMsg"></div></form>`, 'coral',
       `<button class="btn btn-ghost" data-act="close-modal">Batal</button><button class="btn btn-primary" form="akunLiveHapusForm" type="submit" id="ahBtn">Hapus akun</button>`);
