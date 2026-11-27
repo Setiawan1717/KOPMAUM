@@ -366,3 +366,48 @@ textarea.csv { width: 100%; min-height: 220px; font-family: ui-monospace, 'SF Mo
 .demo-box { border-top: 1px solid var(--line); padding-top: 14px; }
 .demo-box summary { cursor: pointer; font-size: .86rem; font-weight: 600; color: var(--muted); width: fit-content; }
 .demo-box summary:hover { color: var(--text); }
+
+/* ---------- Halaman Akun: gaya tenang (tabel, satu warna aksen, tanpa kartu) ---------- */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ak { --ak-aksen: #12936F; --ak-hover: color-mix(in srgb, var(--text) 4%, transparent); max-width: 1040px; display: grid; gap: 16px; font-size: .9rem; }
+.ak h1 { font-family: var(--font-body); font-size: 1.375rem; font-weight: 600; letter-spacing: -0.015em; }
+.ak-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.ak-head p { margin: 2px 0 0; color: var(--muted); font-size: .85rem; }
+.ak-btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border: 0; border-radius: 6px;
+  background: var(--ak-aksen); color: #fff; font: inherit; font-weight: 500; cursor: pointer; }
+.ak-btn:hover { filter: brightness(1.08); }
+.ak-btn:focus-visible, .ak-menu summary:focus-visible, .ak-pop button:focus-visible { outline: 2px solid var(--ak-aksen); outline-offset: 2px; }
+.ak-cari { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; max-width: 360px;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--muted); }
+.ak-cari:focus-within { border-color: var(--muted); }
+.ak-cari input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--text); font: inherit; }
+.ak-tabel { width: 100%; border-collapse: collapse; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); border-spacing: 0; overflow: visible; }
+.ak-tabel th { text-align: left; font-weight: 500; font-size: .78rem; color: var(--muted); padding: 9px 14px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.ak-tabel thead tr:first-child th:first-child { border-top-left-radius: 8px; }
+.ak-tabel thead tr:first-child th:last-child { border-top-right-radius: 8px; }
+.ak-tabel td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.ak-tabel tbody tr:last-child td { border-bottom: 0; }
+.ak-tabel tbody tr:hover td { background: var(--ak-hover); }
+.ak-nama { font-weight: 500; }
+.ak-sub { color: var(--muted); font-size: .8rem; margin-top: 1px; }
+.ak-hp { display: none; }
+.ak-kamu { font-size: .75rem; font-weight: 400; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; margin-left: 4px; }
+.ak-kosong { color: var(--muted); opacity: .6; }
+.ak-nol { padding: 24px 0; text-align: center; opacity: 1; }
+.ak-catatan { margin: 0; color: var(--muted); font-size: .8rem; }
+.ak-aksi { width: 48px; text-align: right; }
+.ak-menu { position: relative; display: inline-block; }
+.ak-menu summary { list-style: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 6px; color: var(--muted); cursor: pointer; }
+.ak-menu summary::-webkit-details-marker { display: none; }
+.ak-menu summary:hover, .ak-menu[open] summary { background: var(--surface-2); color: var(--text); }
+.ak-menu summary svg circle { fill: currentColor; stroke: none; }
+.ak-pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 160px; padding: 4px; text-align: left;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface); box-shadow: 0 8px 24px rgba(0, 0, 0, .12); }
+.ak-pop button { display: block; width: 100%; padding: 7px 10px; border: 0; border-radius: 5px; background: none; color: var(--text); font: inherit; font-size: .85rem; text-align: left; cursor: pointer; }
+.ak-pop button:hover { background: var(--surface-2); }
+.ak-pop .ak-danger { color: var(--coral-ink); }
+@media (max-width: 720px) {
+  .ak-col { display: none; }
+  .ak-hp { display: inline; }
+  .ak-cari { max-width: none; }
+}
