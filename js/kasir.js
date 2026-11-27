@@ -12,7 +12,7 @@ const KOSONG = () => ({
   on: false, status: 'off', error: '', email: '', akun: null,
   products: [], transactions: [], pengeluaran: [], kasirError: '',
   rpPerPoin: 1000, rumusInfo: null, rumusError: '', waBendahara: '', kontakError: '', GAJI_PERSEN: 1, MIN_TARIK: 10000,
-  anggota: [], anggotaError: '', anggotaSaya: null, akunList: [], akunError: '', jejak: [], jejakError: '',
+  anggota: [], anggotaError: '', anggotaSaya: null, akunList: [], akunError: '', aktivitasAkun: null, jejak: [], jejakError: '',
   _poin: [], _riwayat: {}, poinError: '',
   jadwal: [], jadwalError: '', penarikan: [], penarikanError: '', _gaji: { hari: [], total: 0, dibayar: 0, diajukan: 0, saldo: 0 }, gajiError: '',
   laporanBulan: '', trxLaporan: [], laporanError: '', laporanSiap: false,
@@ -172,7 +172,21 @@ const Kasir = {
     return this._bagian('akunError', async () => {
       const rows = this._ok(await this._sb.from('akun').select('id, username, role, hub, nama, nia').order('username'));
       this.akunList = rows.map((a) => ({ uid: a.id, username: a.username, role: a.role, hub: a.hub || [], nama: a.nama || '', nia: a.nia || '' }));
+      if (this._admin || this._punya('ketua', 'sekretaris', 'bendahara')) this._muatAktivitasAkun();
     });
+  },
+  // terakhir jaga & jumlah transaksi tiap nama pengguna (dari ringkasan harian kasir; gagal = kolom disembunyikan)
+  async _muatAktivitasAkun() {
+    try {
+      const hasil = {}; let dari = 0;
+      for (;;) {
+        const rows = this._ok(await this._sb.rpc('gaji_harian', { p_username: null }).range(dari, dari + 999));
+        rows.forEach((d) => { const h = hasil[d.kasir] || (hasil[d.kasir] = { terakhir: '', n: 0 }); h.n += Number(d.n); if (d.tanggal > h.terakhir) h.terakhir = d.tanggal; });
+        if (rows.length < 1000) break; dari += 1000;
+      }
+      this.aktivitasAkun = hasil;
+    } catch (e) { this.aktivitasAkun = null; }
+    this.onChange();
   },
   _muatJejak() {
     return this._bagian('jejakError', async () => {

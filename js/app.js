@@ -211,7 +211,7 @@ function render() {
         <div class="spacer"></div>
         <button class="avatar c-${avColor(p.id)}" data-act="menu-akun" aria-label="Menu akun">${esc(inisial(p.nama))}</button>
       </header>
-      <main class="main c-${cur.color}" id="main"><div class="main-inner">${VIEWS[ui.view]()}</div></main>
+      <main class="main c-${cur.color} v-${ui.view}" id="main"><div class="main-inner">${VIEWS[ui.view]()}</div></main>
     </div>
     <nav class="bottomnav" aria-label="Navigasi">
       ${nav.map((n) => `<a href="#${n.id}" class="bn-item c-${n.color} ${n.id === ui.view ? 'active' : ''}"><span class="dot">${ic(n.icon)}</span>${esc(navLabel(n).split(' ')[0])}</a>`).join('')}
@@ -961,33 +961,46 @@ function viewFee() {
 
 /* ---------- Akun & peran ---------- */
 const PERAN_HUB = ['ketua', 'sekretaris', 'bendahara', 'bidang_usaha', 'petugas_jaga', 'pengurus'];
+const AK_FILTER = { semua: ['Semua', () => true], pengurus: ['Pengurus', (u) => (u.hub || []).some((r) => r !== 'petugas_jaga')], jaga: ['Petugas jaga', (u) => (u.hub || []).includes('petugas_jaga')], tanpa: ['Tanpa peran', (u) => !(u.hub || []).length] };
+function terakhirJaga(tgl) {
+  if (!tgl) return 'Belum pernah';
+  const hari = Math.round((parseYmd(TODAY) - parseYmd(tgl)) / 864e5);
+  if (hari <= 0) return 'Hari ini'; if (hari === 1) return 'Kemarin'; if (hari < 7) return `${hari} hari lalu`;
+  if (hari < 35) return `${Math.floor(hari / 7)} minggu lalu`;
+  const d = parseYmd(tgl); return `${d.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'][d.getMonth()]} ${d.getFullYear()}`;
+}
 function viewAkunLive() {
-  const q = (ui.q.akunLive || '').toLowerCase();
+  const q = (ui.q.akunLive || '').toLowerCase(); const f = AK_FILTER[ui.akunFilter] ? ui.akunFilter : 'semua';
   const namaDari = (u) => anggotaByNia(u.nia)?.nama || u.nama || u.username;
-  const rows = Kasir.akunList.filter((u) => !q || [u.username, namaDari(u), u.nia].some((v) => String(v || '').toLowerCase().includes(q)));
-  const ketua = Kasir.ketua;
+  const cocok = Kasir.akunList.filter((u) => !q || [u.username, namaDari(u), u.nia].some((v) => String(v || '').toLowerCase().includes(q)));
+  const rows = cocok.filter(AK_FILTER[f][1]);
+  const ketua = Kasir.ketua; const akt = Kasir.aktivitasAkun;
   const kasir = { admin: 'Admin', kasir: 'Kasir' };
+  const kosong = '<span class="ak-kosong">—</span>';
   const peran = (u) => (u.hub || []).filter((r) => ROLES[r]).map((r) => ROLES[r].label).join(', ');
-  const baris = (u) => {
-    const nama = namaDari(u); const saya = u.uid === Kasir.akun?.uid; const pr = peran(u);
-    const menu = saya ? '' : `<details class="ak-menu"><summary aria-label="Aksi untuk ${esc(u.username)}">${ic('more', 'icon-sm')}</summary><div class="ak-pop">
-        <button type="button" data-act="peran-live" data-uid="${esc(u.uid)}">Atur peran</button>
+  const baris = (u, i) => {
+    const saya = u.uid === Kasir.akun?.uid; const pr = peran(u); const a = akt?.[u.username];
+    const menu = saya ? '' : `<details class="ak-menu"><summary>Ubah</summary><div class="ak-pop">
+        <button type="button" data-act="peran-live" data-uid="${esc(u.uid)}">Atur jabatan</button>
         ${ketua ? `<button type="button" class="ak-danger" data-act="akun-live-hapus" data-uid="${esc(u.uid)}">Hapus akun</button>` : ''}</div></details>`;
     return `<tr>
-      <td><div class="ak-nama">${esc(nama)}${saya ? ' <span class="ak-kamu">kamu</span>' : ''}</div><div class="ak-sub">${esc(u.username)}<span class="ak-hp">${[u.nia, kasir[u.role] && 'Kasir ' + kasir[u.role].toLowerCase(), pr].filter(Boolean).map((x) => ' · ' + esc(x)).join('')}</span></div></td>
-      <td class="ak-col num">${u.nia ? esc(u.nia) : '<span class="ak-kosong">—</span>'}</td>
-      <td class="ak-col">${kasir[u.role] ? esc(kasir[u.role]) : '<span class="ak-kosong">—</span>'}</td>
-      <td class="ak-col">${pr ? esc(pr) : '<span class="ak-kosong">—</span>'}</td>
+      <td class="ak-no">${String(i + 1).padStart(2, '0')}</td>
+      <td><div class="ak-nama">${esc(namaDari(u))}${saya ? '<span class="ak-kamu">— kamu</span>' : ''}</div><div class="ak-sub">${esc(u.username)}<span class="ak-hp">${[u.nia, pr, u.role === 'admin' ? 'admin kasir' : u.role === 'kasir' ? 'kasir' : ''].filter(Boolean).map((x) => ' · ' + esc(x)).join('')}</span></div></td>
+      <td class="ak-col ak-mono">${u.nia ? esc(u.nia) : kosong}</td>
+      <td class="ak-col">${pr ? esc(pr) : kosong}</td>
+      <td class="ak-col">${kasir[u.role] ? esc(kasir[u.role]) : kosong}</td>
+      ${akt ? `<td class="ak-col">${kasir[u.role] || a ? esc(terakhirJaga(a?.terakhir)) : kosong}</td><td class="ak-col ak-mono ak-r">${a ? a.n.toLocaleString('id-ID') : kosong}</td>` : ''}
       <td class="ak-aksi">${menu}</td></tr>`;
   };
   return `<div class="ak">
-  <div class="ak-head"><div><h1>Akun</h1><p>${Kasir.akunList.length} akun</p></div>
-    ${ketua ? `<button class="ak-btn" data-act="akun-live-baru">${ic('plus', 'icon-sm')}Tambah akun</button>` : ''}</div>
+  <div class="ak-head"><div><h1>Daftar akun</h1><p>Siapa saja yang bisa masuk ke Kopma Hub dan web kasir.</p></div>
+    ${ketua ? `<button class="ak-btn" data-act="akun-live-baru">+ Tambah akun</button>` : ''}</div>
   ${Kasir.akunError ? `<div class="notice c-coral">${ic('alert')}<span>${esc(Kasir.akunError)}</span></div>` : ''}
-  <div class="ak-cari">${ic('search', 'icon-sm')}<input data-live="akunLive" placeholder="Cari nama, nama pengguna, atau NIA" value="${esc(ui.q.akunLive || '')}" aria-label="Cari akun"></div>
-  ${rows.length ? `<table class="ak-tabel" id="listAkunLive"><thead><tr><th>Nama</th><th class="ak-col">NIA</th><th class="ak-col">Kasir</th><th class="ak-col">Peran</th><th class="ak-aksi"><span class="sr-only">Aksi</span></th></tr></thead>
-    <tbody>${rows.map(baris).join('')}</tbody></table>` : `<p class="ak-kosong ak-nol">${q ? 'Tidak ada akun yang cocok.' : 'Belum ada akun.'}</p>`}
-  <p class="ak-catatan">Role admin kasir diatur lewat dashboard Supabase.</p>
+  <div class="ak-alat"><input class="ak-cari" data-live="akunLive" placeholder="Cari nama atau NIA" value="${esc(ui.q.akunLive || '')}" aria-label="Cari akun">
+    <div class="ak-filter" role="tablist">${Object.entries(AK_FILTER).map(([k, [lbl, fn]]) => `<button type="button" role="tab" aria-selected="${k === f}" class="${k === f ? 'on' : ''}" data-act="akun-filter" data-k="${k}">${lbl} (${cocok.filter(fn).length})</button>`).join('')}</div></div>
+  ${rows.length ? `<table class="ak-tabel" id="listAkunLive"><thead><tr><th class="ak-no">No.</th><th>Nama</th><th class="ak-col">NIA</th><th class="ak-col">Jabatan</th><th class="ak-col">Kasir</th>${akt ? '<th class="ak-col">Terakhir jaga</th><th class="ak-col ak-r">Transaksi</th>' : ''}<th class="ak-aksi"><span class="sr-only">Aksi</span></th></tr></thead>
+    <tbody>${rows.map(baris).join('')}</tbody></table>` : `<p class="ak-nol">${q ? 'Tidak ada akun yang cocok.' : 'Belum ada akun di kelompok ini.'}</p>`}
+  <div class="ak-kaki"><span>Hapus akun tidak menghapus riwayat transaksi. Admin kasir diatur lewat dashboard Supabase.</span></div>
   </div>`;
 }
 
@@ -1188,6 +1201,7 @@ const ACT = {
       <p class="small muted">Ketua & sekretaris: kelola anggota dan peran. Bendahara: lihat data anggota. Tanpa peran: anggota biasa.</p><div id="plMsg"></div></form>`, 'mint',
       `${(u.hub || []).length ? `<button class="btn btn-ghost" data-act="peran-live-kosong" style="margin-right:auto;color:var(--coral-ink)">${ic('x', 'icon-sm')}Hapus semua peran</button>` : ''}<button class="btn btn-ghost" data-act="close-modal">Batal</button><button class="btn btn-primary" form="peranLiveForm" type="submit" id="plBtn">Simpan peran</button>`);
   },
+  'akun-filter': (el) => { ui.akunFilter = el.dataset.k; render(); },
   'peran-live-kosong': () => {
     const f = $('#peranLiveForm'); if (!f) return;
     f.querySelectorAll('[name=peran]').forEach((i) => { i.checked = false; i.closest('.chip').classList.remove('on'); });
